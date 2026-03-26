@@ -12,7 +12,7 @@ void led_blinky(void *pvParameters){
         xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
         int state = ctx->ledState;
         xSemaphoreGive(ctx->mutexContext);
-        if (state == 3) delay_ms = 50;
+        if (state == 3) delay_ms = 100;
         else if (state == 2) delay_ms = 500;
         else delay_ms = 1000;
     }
