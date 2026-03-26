@@ -46,6 +46,16 @@ void temp_humi_monitor(void *pvParameters){
                 ctx->ledState = newLedState;
                 xSemaphoreGive(ctx->semLEDUpdate);
             }
+
+            // Task 2 Logic
+            int newNeoState = 1; // Normal
+            if (humidity >= 70.0) newNeoState = 3; // Critical
+            else if (humidity >= 50.0) newNeoState = 2; // Warning
+            
+            if (newNeoState != ctx->neoState) {
+                ctx->neoState = newNeoState;
+                xSemaphoreGive(ctx->semNeoUpdate);
+            }
             
             xSemaphoreGive(ctx->mutexContext);
         }

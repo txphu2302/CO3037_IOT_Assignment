@@ -1,241 +1,341 @@
-# IoT Project Assignment - Task 1: Temperature-Based LED Blinking Control
+# IoT Project Assignment - Task 2: NeoPixel Control (Humidity-Based)
 
 ## Overview
-Task 1 implements a real-time temperature monitoring system that controls a single LED's blinking frequency based on temperature thresholds detected by the DHT20 sensor. This task demonstrates the removal of global variables and utilizes FreeRTOS semaphores for task synchronization, following the assignment requirements for Tasks 1, 2, and 3.
+Task 2 implements a real-time humidity monitoring system that controls a NeoPixel RGB LED's color based on humidity thresholds detected by the DHT20 sensor. This task demonstrates event-driven architecture using FreeRTOS semaphores for efficient task synchronization, eliminating the need for constant polling.
 
 ---
 
-## Task 1: Single LED Control (Temperature-Based)
+## Task 2: NeoPixel RGB LED Control (Humidity-Based)
 
 ### Objective
-Monitor temperature readings from the DHT20 sensor and dynamically adjust the LED blinking speed based on predefined temperature thresholds:
-- **Normal State (< 25°C)**: Slow blink (1000ms delay)
-- **Warning State (25-30°C)**: Medium blink (500ms delay)
-- **Critical State (≥ 30°C)**: Fast blink (100ms delay)
+Monitor humidity readings from the DHT20 sensor and display real-time color changes on a NeoPixel RGB LED based on predefined humidity thresholds:
+- **Normal State (< 50%)**: Green color
+- **Warning State (50-70%)**: Yellow color  
+- **Critical State (≥ 70%)**: Red color
 
 ### Hardware Components
 | Component | GPIO Pin | Description |
 |-----------|----------|-------------|
-| DHT20 Sensor | SDA: 11, SCL: 12 | Temperature & Humidity sensor via I2C |
-| Single LED | GPIO 48 | Controlled LED for state indication |
+| NeoPixel RGB LED | GPIO 45 | WS2812B addressable RGB LED strip |
+| DHT20 Sensor | SDA: 11, SCL: 12 | Humidity & Temperature sensor via I2C |
+| Power Supply | VCC/GND | 5V for NeoPixel operation |
 
-### Architecture
-
-#### 1. **Data Encapsulation with SharedContext**
-Instead of using global variables, all task data is encapsulated in a `SharedContext` structure defined in [include/global.h](include/global.h):
-
-```c
-struct SharedContext {
-    float temperature;           // Current temperature reading
-    float humidity;              // Current humidity reading
-    SemaphoreHandle_t mutexContext;   // Mutex for thread-safe access
-    SemaphoreHandle_t semLEDUpdate;   // Binary semaphore for LED task
-    int ledState;                // 1: Normal, 2: Warning, 3: Critical
-};
+### Hardware Configuration
 ```
+ESP32-S3
+├─ GPIO 45  → NeoPixel Data Pin
+└─ GPIO 11/12 → DHT20 I2C (SDA/SCL) [shared with Task 1]
 
-#### 2. **Task Responsibilities**
-
-##### **Temperature & Humidity Monitor Task** ([src/temp_humi_monitor.cpp](src/temp_humi_monitor.cpp))
-- Reads DHT20 sensor every 5 seconds
-- Evaluates temperature against thresholds
-- Updates `SharedContext` with:
-  - Current temperature and humidity values
-  - New LED state based on temperature range
-- Signals the LED task via `semLEDUpdate` when state changes occur
-- Protects all data access with `mutexContext`
-
-**Pseudo-code:**
-```
-LOOP every 5 seconds:
-  1. Read temperature from DHT20
-  2. LOCK mutexContext
-  3. Update ctx->temperature
-  4. Calculate newLedState based on temperature thresholds
-  5. IF newLedState != currentLedState:
-       - Update ctx->ledState
-       - SIGNAL semLEDUpdate (wake LED task)
-  6. UNLOCK mutexContext
-  7. Print readings to Serial
-```
-
-##### **LED Blink Control Task** ([src/led_blinky.cpp](src/led_blinky.cpp))
-- Waits for state change notifications via `semLEDUpdate`
-- Adjusts blink delay based on current LED state:
-  - State 1: 1000ms (Normal)
-  - State 2: 500ms (Warning)
-  - State 3: 100ms (Critical)
-- Implements breakable delays using semaphore waits instead of `vTaskDelay`
-- Continuously toggles LED based on delay duration
-
-**Pseudo-code:**
-```
-LOOP continuously:
-  1. LOCK and read ctx->ledState
-  2. Set delay_ms based on ledState
-  3. Turn LED ON
-  4. WAIT on semLEDUpdate OR timeout(delay_ms)
-  5. Turn LED OFF
-  6. WAIT on semLEDUpdate OR timeout(delay_ms)
-```
-
-### Synchronization Mechanism
-
-#### FreeRTOS Primitives Used
-1. **Mutex (`mutexContext`)**
-   - Protects read/write operations on `SharedContext`
-   - Prevents race conditions between monitor and LED tasks
-   - Used with `xSemaphoreTake()` and `xSemaphoreGive()`
-
-2. **Binary Semaphore (`semLEDUpdate`)**
-   - Signals LED task when temperature state changes
-   - Allows immediate response to threshold changes
-   - Reduces wasted CPU cycles with breakable delays
-
-**Flow Diagram:**
-```
-Temperature Monitor Task          LED Blink Task
-        |                               |
-        |-- Read DHT20                  |
-        |-- Lock mutex                  |
-        |-- Check threshold             |-- Wait on semLEDUpdate
-        |-- Update ledState             |   (with timeout)
-        |-- Signal LED (Give semaphore) |
-        |-- Unlock mutex                |-- Adjust blink speed
-        |-- Sleep 5s                    |-- Blink LED
-        |                               |-- Loop
-```
-
-### Implementation Details
-
-#### Global Variables Removal
-**Before (Global Variables):**
-```c
-extern float glob_temperature;    // ❌ Global
-extern float glob_humidity;       // ❌ Global
-```
-
-**After (Context-Based):**
-```c
-SharedContext* ctx = (SharedContext*)pvParameters;  // ✅ Local via task parameter
-ctx->temperature = temperature;
-ctx->humidity = humidity;
-```
-
-#### Mutex-Protected Access
-All access to shared data follows this pattern:
-```c
-xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
-// Critical section: read or write ctx->temperature, ctx->humidity, ctx->ledState
-xSemaphoreGive(ctx->mutexContext);
-```
-
-#### Breakable Delays
-Instead of blocking with `vTaskDelay()`, the LED task uses semaphore timeouts:
-```c
-// LED can be interrupted if state changes
-if (xSemaphoreTake(ctx->semLEDUpdate, pdMS_TO_TICKS(delay_ms))) {
-    // Semaphore given early → state changed, restart loop
-    digitalWrite(LED_GPIO, LOW);
-    continue;
-}
-// Timeout occurred → continue normal blinking
 ```
 
 ---
+
+## Architecture
+
+### Data Structure
+All task data is encapsulated in `SharedContext` (defined in [include/global.h](include/global.h)):
+
+```c
+struct SharedContext {
+    float temperature;              // Current temperature reading
+    float humidity;                 // Current humidity reading
+    SemaphoreHandle_t mutexContext;     // Mutex for thread-safe access
+    SemaphoreHandle_t semNeoUpdate;     // Binary semaphore for NeoPixel task
+    int neoState;                   // 1: Normal, 2: Warning, 3: Critical
+};
+```
+
+### Task Responsibilities
+
+#### **1. Temperature & Humidity Monitor Task** ([src/temp_humi_monitor.cpp](src/temp_humi_monitor.cpp))
+
+This unified sensor reading task monitors both temperature (for Task 1) and humidity (for Task 2):
+
+**Task 2 Specific Logic:**
+- Reads DHT20 sensor every 5 seconds
+- Evaluates humidity against predefined thresholds
+- Determines new NeoPixel state based on humidity level
+- Updates `ctx->neoState` only when threshold boundaries are crossed
+- Signals the NeoPixel task via `semNeoUpdate` when state changes occur
+- Protects all data access with `mutexContext`
+
+**Humidity Threshold Logic:**
+```c
+int newNeoState = 1; // Default: Normal
+
+if (humidity >= 70.0) {
+    newNeoState = 3;  // Critical
+} else if (humidity >= 50.0) {
+    newNeoState = 2;  // Warning
+}
+
+// Only signal if state actually changed
+if (newNeoState != ctx->neoState) {
+    ctx->neoState = newNeoState;
+    xSemaphoreGive(ctx->semNeoUpdate);  // Wake NeoPixel task
+}
+```
+
+**Pseudo-code Flow:**
+```
+LOOP every 5 seconds:
+  1. Read humidity from DHT20
+  2. Lock mutexContext
+  3. Update ctx->humidity
+  4. Calculate newNeoState based on humidity thresholds
+  5. IF newNeoState != currentNeoState:
+       └─ Update ctx->neoState
+       └─ Give semNeoUpdate (wake NeoPixel task)
+  6. Unlock mutexContext
+  7. Sleep 5 seconds
+```
+
+#### **2. NeoPixel Control Task** ([src/neo_blinky.cpp](src/neo_blinky.cpp))
+
+Handles real-time color updates based on humidity state changes:
+
+**Key Features:**
+- Event-driven: Waits for `semNeoUpdate` notifications from monitor task
+- Responds immediately to humidity threshold changes
+- Uses Adafruit_NeoPixel library to set RGB colors
+- Thread-safe access to shared state via mutex
+- Low CPU utilization: Blocks indefinitely until signaled
+
+**Initialization Phase:**
+```c
+// 1. Initialize NeoPixel library
+Adafruit_NeoPixel strip(LED_COUNT, NEO_PIN, NEO_GRB + NEO_KHZ800);
+strip.begin();
+strip.clear();
+strip.show();
+
+// 2. Get initial state from context
+xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+int state = ctx->neoState;
+xSemaphoreGive(ctx->mutexContext);
+
+// 3. Display initial color
+if (state == 1) strip.setPixelColor(0, strip.Color(0, 255, 0));   // Green
+else if (state == 2) strip.setPixelColor(0, strip.Color(255, 255, 0)); // Yellow
+else if (state == 3) strip.setPixelColor(0, strip.Color(255, 0, 0));   // Red
+strip.show();
+```
+
+**Main Loop:**
+```c
+while(1) {
+    // 1. Block and wait for state change signal
+    xSemaphoreTake(ctx->semNeoUpdate, portMAX_DELAY);
+    
+    // 2. Safely read current state
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    int state = ctx->neoState;
+    xSemaphoreGive(ctx->mutexContext);
+    
+    // 3. Update NeoPixel color based on state
+    if (state == 1) {
+        strip.setPixelColor(0, strip.Color(0, 255, 0));   // Green: Normal
+    } else if (state == 2) {
+        strip.setPixelColor(0, strip.Color(255, 255, 0)); // Yellow: Warning
+    } else if (state == 3) {
+        strip.setPixelColor(0, strip.Color(255, 0, 0));   // Red: Critical
+    }
+    
+    // 4. Apply changes to LED
+    strip.show();
+}
+```
+
+---
+
+## Synchronization Mechanism
+
+### FreeRTOS Primitives Used
+
+#### **1. Binary Semaphore (`semNeoUpdate`)**
+Purpose: Signal NeoPixel task when humidity state changes
+
+**Characteristics:**
+- Given (released) by monitor task when `neoState` changes
+- Taken (acquired) by NeoPixel task after waiting
+- Uses `portMAX_DELAY` timeout = blocks indefinitely until signaled
+- Prevents wasteful polling and reduces CPU load
+
+**Flow:**
+```
+Time    Monitor Task                    NeoPixel Task
+────────────────────────────────────────────────────────
+t0      Read humidity (48%)
+        Calculate state (Normal → 1)
+        State changed!
+        Give semNeoUpdate  ──────────→  Wake up from block
+                                        xSemaphoreTake returns
+t1                                      Lock & read state
+                                        Set color = Green
+                                        Display
+t2                                      xSemaphoreTake(timeout=MAX)
+                                        Block waiting...
+```
+
+#### **2. Mutex (`mutexContext`)**
+Purpose: Protect access to shared `SharedContext` data
+
+**Protected Operations:**
+- Read/write `ctx->humidity`
+- Read/write `ctx->neoState`
+- Any modification to shared data
+
+**Usage Pattern:**
+```c
+xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+// Critical section: Read or modify ctx->humidity, ctx->neoState
+xSemaphoreGive(ctx->mutexContext);
+```
+
+---
+
+## Implementation Details
+
+### NeoPixel Library: Adafruit_NeoPixel
+
+The implementation uses the **Adafruit_NeoPixel** library for controlling WS2812B RGB LEDs:
+
+```cpp
+// Initialization
+Adafruit_NeoPixel strip(LED_COUNT, NEO_PIN, NEO_GRB + NEO_KHZ800);
+strip.begin();  // Initialize library and GPIO
+
+// Setting color
+strip.setPixelColor(pixelIndex, color);
+
+// Displaying changes
+strip.show();   // Transmit color data to LED
+
+// Color definition
+uint32_t color = strip.Color(red, green, blue);  // RGB values 0-255
+```
+
+### Color Mapping & RGB Values
+
+| State | Condition | Color | RGB Value | Meaning |
+|-------|-----------|-------|-----------|---------|
+| 1 | humidity < 50% | Green | (0, 255, 0) | Normal/Healthy |
+| 2 | 50% ≤ humidity < 70% | Yellow | (255, 255, 0) | Warning/Caution |
+| 3 | humidity ≥ 70% | Red | (255, 0, 0) | Critical/Alert |
+
+**Color Selection Rationale:**
+- **Green** → Universal symbol for "all clear" or normal conditions
+- **Yellow** → Warning indicator, needs attention
+- **Red** → Critical alert, immediate action required
+- Standard in monitoring dashboards and industrial systems
+
+### Humidity Thresholds
+
+```
+         0% ─────────────── 50% ─────────────── 70% ─────── 100%
+         │                  │                  │
+      [Normal: Green]   [Warning: Yellow]  [Critical: Red]
+         │                  │                  │
+         └──────────────────┴──────────────────┘
+                   Humidity Scale
+```
+
+**Threshold Logic:**
+- **Normal**: humidity < 50% (dry conditions)
+- **Warning**: 50% ≤ humidity < 70% (moderate humidity)
+- **Critical**: humidity ≥ 70% (high humidity, potential condensation)
+
+---
+
+
 
 ## State Transition Diagram
 
 ```
-        Temperature < 25°C
-            (Normal)
-              ↓ ↑
-          1000ms delay
-          
-        25°C ≤ Temp < 30°C
-           (Warning)
-              ↓ ↑
-          500ms delay
-          
-        Temperature ≥ 30°C
-           (Critical)
-              ↓ ↑
-          100ms delay
+┌──────────────────────────────────────────────────────────┐
+│                  Humidity Monitor                         │
+│              (reads DHT20 every 5s)                       │
+└──────────────┬───────────────────────────────────────────┘
+               │
+               ↓
+        ┌─────────────────────────────────────┐
+        │     Evaluate Humidity Thresholds    │
+        └────────┬──────────────────┬─────────┘
+                 │                  │
+        ┌────────▼─────┐    ┌──────▼──────┐
+        │State Changed? │    │No Change    │
+        └────────┬─────┘    │ Skip Signal  │
+                 │          └─────────────┘
+                 │ YES
+    ┌────────────▼────────────────┐
+    │ Give semNeoUpdate           │
+    │ (Wake NeoPixel Task)        │
+    └────────┬─────────────────────┘
+             │
+             ↓
+    ┌──────────────────────────────┐
+    │  NeoPixel Control Task       │
+    │ (woken by semaphore signal)  │
+    └────────┬──────────────────────┘
+             │
+    ┌────────▼─────────────────────┐
+    │  Read neoState              │
+    │  (with mutex protection)    │
+    └────────┬──────────────────────┘
+             │
+    ┌────────▼─────────────────────┐
+    │  Set Color Based on State:  │
+    │  1 → Green                  │
+    │  2 → Yellow                 │
+    │  3 → Red                    │
+    └────────┬──────────────────────┘
+             │
+    ┌────────▼─────────────────────┐
+    │  Display Color on NeoPixel  │
+    │  strip.show()               │
+    └────────┬──────────────────────┘
+             │
+    ┌────────▼──────────────────────┐
+    │ Return to Wait State          │
+    │ (portMAX_DELAY)               │
+    └───────────────────────────────┘
 ```
 
 ---
 
-
-## Testing & Verification
-
-### Manual Verification Steps
-
-1. **Normal State Testing (< 25°C)**
-   - Ensure temperature reading is below 25°C
-   - Observe LED blinking slowly (1000ms on/off)
-   - Verify Serial output shows "Normal" state
-
-2. **Warning State Testing (25-30°C)**
-   - Gradually increase temperature (apply warm object near sensor)
-   - When temperature enters 25-30°C range, observe LED blink speed increase to 500ms
-   - Verify state change is immediate without delay
-
-3. **Critical State Testing (≥ 30°C)**
-   - Continue warming the sensor to reach ≥ 30°C
-   - LED should blink very rapidly at 100ms intervals
-   - Verify Serial output shows temperature readings
-
-4. **Code Verification**
-   - Compile successfully: `pio run` (should have 0 errors)
-   - Inspect object code to confirm no global variable sections
-   - Verify all `SharedContext` access is protected by mutex
-
-### Expected Behavior
-| Temperature Range | LED Behavior | Blink Delay |
-|------------------|--------------|------------|
-| < 25°C | Slow, steady blinks | 1000ms |
-| 25-30°C | Medium speed blinks | 500ms |
-| ≥ 30°C | Rapid, fast blinks | 100ms |
-
----
 
 ## File Structure
 
 ```
 src/
-├── temp_humi_monitor.cpp    # Temperature/Humidity sensor reading & monitoring
-├── led_blinky.cpp           # LED control task with dynamic blinking
-└── main.cpp                 # SharedContext initialization & FreeRTOS setup
+├── temp_humi_monitor.cpp    # Sensor reading + Task 1 & Task 2 logic
+├── led_blinky.cpp           # Task 1: LED control (temperature)
+├── neo_blinky.cpp           # Task 2: NeoPixel control (humidity)
+└── main.cpp                 # FreeRTOS initialization & task creation
 
 include/
-├── global.h                 # SharedContext definition & semaphore declarations
-├── temp_humi_monitor.h      # Monitor task function declaration
-└── led_blinky.h             # LED task function declaration
+├── global.h                 # SharedContext & semaphore declarations
+├── temp_humi_monitor.h      # Monitor task declaration
+├── led_blinky.h             # LED task declaration
+└── neo_blinky.h             # NeoPixel task declaration (GPIO 45, LED_COUNT=1)
 
 lib/
-├── DHT20/                   # Temperature/Humidity sensor driver
+├── DHT20/                   # DHT20 temperature/humidity sensor driver
+├── Adafruit_NeoPixel/       # Adafruit NeoPixel control library
 └── ... (other libraries)
 ```
 
 ---
 
-## Notes & Design Decisions
-
-1. **Polling Interval**: Temperature monitor polls every 5 seconds to balance responsiveness with power consumption.
-
-2. **Semaphore Signaling**: The monitor task signals the LED task only on state changes, not continuously, reducing unnecessary task wakeups.
-
-3. **Mutex Protection**: All `SharedContext` access is protected to prevent race conditions, even though this is a single-core device (ensures portability).
-
-4. **Breakable Delays**: Using semaphore timeouts instead of `vTaskDelay` allows the LED task to respond immediately if the semaphore is given early (state change notification).
-
-5. **Error Handling**: DHT20 read failures are detected (NaN checks) and handled gracefully without crashing the temperature monitoring loop.
-
----
 
 ## References
 
 - [FreeRTOS Documentation](https://www.freertos.org/)
-- [ESP32 GPIO Configuration](https://github.com/espressif/esp-idf)
-- [DHT20 Sensor Library](lib/DHT20/)
+- [FreeRTOS Binary Semaphores](https://www.freertos.org/Embedded-RTOS-Binary-Semaphores.html)
+- [Adafruit NeoPixel Library](https://github.com/adafruit/Adafruit_NeoPixel)
+- [WS2812B NeoPixel Datasheet](https://datasheets.raspberrypi.com/ws2812/ws2812.pdf)
+- [ESP32 Technical Reference](https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf)
+- [DHT20 Sensor Documentation](lib/DHT20/)
 - [PlatformIO Documentation](https://docs.platformio.org/)
+
+
