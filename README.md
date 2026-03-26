@@ -333,9 +333,7 @@ lib/
 - [FreeRTOS Documentation](https://www.freertos.org/)
 - [FreeRTOS Binary Semaphores](https://www.freertos.org/Embedded-RTOS-Binary-Semaphores.html)
 - [Adafruit NeoPixel Library](https://github.com/adafruit/Adafruit_NeoPixel)
-- [WS2812B NeoPixel Datasheet](https://datasheets.raspberrypi.com/ws2812/ws2812.pdf)
 - [ESP32 Technical Reference](https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf)
-- [DHT20 Sensor Documentation](lib/DHT20/)
 - [PlatformIO Documentation](https://docs.platformio.org/)
 
 
