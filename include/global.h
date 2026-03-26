@@ -6,6 +6,18 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
+struct SharedContext {
+    float temperature;
+    float humidity;
+    SemaphoreHandle_t mutexContext;
+    SemaphoreHandle_t semLEDUpdate;
+    int ledState; // 1: Normal, 2: Warning, 3: Critical
+    SemaphoreHandle_t semNeoUpdate;
+    int neoState;
+    SemaphoreHandle_t semLCDUpdate;
+    int lcdState;
+};
+
 extern float glob_temperature;
 extern float glob_humidity;
 

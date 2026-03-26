@@ -19,9 +19,20 @@ void setup()
   Serial.begin(115200);
   check_info_File(0);
 
-  xTaskCreate(led_blinky, "Task LED Blink", 2048, NULL, 2, NULL);
-  xTaskCreate(neo_blinky, "Task NEO Blink", 2048, NULL, 2, NULL);
-  xTaskCreate(temp_humi_monitor, "Task TEMP HUMI Monitor", 2048, NULL, 2, NULL);
+  SharedContext* ctx = new SharedContext();
+  ctx->temperature = 0;
+  ctx->humidity = 0;
+  ctx->ledState = 1;
+  ctx->neoState = 1;
+  ctx->lcdState = 1;
+  ctx->mutexContext = xSemaphoreCreateMutex();
+  ctx->semLEDUpdate = xSemaphoreCreateBinary();
+  ctx->semNeoUpdate = xSemaphoreCreateBinary();
+  ctx->semLCDUpdate = xSemaphoreCreateBinary();
+
+  xTaskCreate(led_blinky, "Task LED Blink", 2048, (void*)ctx, 2, NULL);
+  xTaskCreate(neo_blinky, "Task NEO Blink", 2048, (void*)ctx, 2, NULL);
+  xTaskCreate(temp_humi_monitor, "Task TEMP HUMI Monitor", 2048, (void*)ctx, 2, NULL);
   // xTaskCreate(main_server_task, "Task Main Server" ,8192  ,NULL  ,2 , NULL);
   // xTaskCreate( tiny_ml_task, "Tiny ML Task" ,2048  ,NULL  ,2 , NULL);
   xTaskCreate(coreiot_task, "CoreIOT Task" ,4096  ,NULL  ,2 , NULL);

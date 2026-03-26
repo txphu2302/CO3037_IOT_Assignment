@@ -31,6 +31,25 @@ void temp_humi_monitor(void *pvParameters){
         glob_temperature = temperature;
         glob_humidity = humidity;
 
+        if (pvParameters != NULL) {
+            SharedContext* ctx = (SharedContext*)pvParameters;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            ctx->temperature = temperature;
+            ctx->humidity = humidity;
+            
+            // Task 1 Logic
+            int newLedState = 1; // Normal
+            if (temperature >= 30.0) newLedState = 3; // Critical
+            else if (temperature >= 25.0) newLedState = 2; // Warning
+            
+            if (newLedState != ctx->ledState) {
+                ctx->ledState = newLedState;
+                xSemaphoreGive(ctx->semLEDUpdate);
+            }
+            
+            xSemaphoreGive(ctx->mutexContext);
+        }
+
         // Print the results
         
         Serial.print("Humidity: ");
