@@ -15,5 +15,6 @@
         "initializer_list": "cpp",
         "span": "cpp",
         "regex": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "D:/Sang/Test_IoT/CO3037_IOT_Assignment/lib/ArduinoJson/src"
 }
