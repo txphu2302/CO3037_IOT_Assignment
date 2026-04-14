@@ -1,6 +1,6 @@
 #include "temp_humi_monitor.h"
 DHT20 dht20;
-LiquidCrystal_I2C lcd(0x21,16,2);
+LiquidCrystal_I2C lcd(0x27,16,2);
 
 static const char* statusText(int state) {
     if (state == 3) return "Critical";

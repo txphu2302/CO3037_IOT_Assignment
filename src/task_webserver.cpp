@@ -47,7 +47,7 @@ void connnectWSV()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(LittleFS, "/index.html", "text/html"); });
+              { request->send(LittleFS, "/test.html", "text/html"); });
     server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/script.js", "application/javascript"); });
     server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
