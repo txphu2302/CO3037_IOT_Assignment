@@ -29,4 +29,11 @@ extern String CORE_IOT_PORT;
 
 extern boolean isWifiConnected;
 extern SemaphoreHandle_t xBinarySemaphoreInternet;
+extern bool led_ap_manual_override;
+extern bool led_ap_manual_state;
+extern bool neo_ap_manual_override;
+extern bool neo_ap_manual_state;
+extern uint8_t neo_ap_color_r;
+extern uint8_t neo_ap_color_g;
+extern uint8_t neo_ap_color_b;
 #endif

@@ -52,6 +52,30 @@ void connnectWSV()
               { request->send(LittleFS, "/script.js", "application/javascript"); });
     server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/styles.css", "text/css"); });
+
+    server.on("/toggle-led", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  led_ap_manual_override = true;
+                  led_ap_manual_state = !led_ap_manual_state;
+                  request->send(200, "text/plain", led_ap_manual_state ? "ON" : "OFF");
+              });
+
+    server.on("/toggle-neo", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  if (request->hasParam("color")) {
+                      String colorHex = request->getParam("color")->value();
+                      if(colorHex.startsWith("#")){
+                          long number = strtol(&colorHex[1], NULL, 16);
+                          neo_ap_color_r = number >> 16;
+                          neo_ap_color_g = number >> 8 & 0xFF;
+                          neo_ap_color_b = number & 0xFF;
+                      }
+                  }
+                  neo_ap_manual_override = true;
+                  neo_ap_manual_state = !neo_ap_manual_state;
+                  request->send(200, "text/plain", neo_ap_manual_state ? "ON" : "OFF");
+              });
+
     server.begin();
     ElegantOTA.begin(&server);
     webserver_isrunning = true;
