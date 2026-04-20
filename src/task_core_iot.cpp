@@ -33,8 +33,7 @@ void processSharedAttributes(const Shared_Attribute_Data &data)
         //     {
         //         blinkingInterval = new_interval;
         //         Serial.print("Blinking interval is set to: ");
-        //         Y
-        //             Serial.println(new_interval);
+        //         Serial.println(new_interval);
         //     }
         // }
         // if (strcmp(it->key().c_str(), LED_STATE_ATTR) == 0)
