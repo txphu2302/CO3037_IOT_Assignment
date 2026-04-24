@@ -153,6 +153,55 @@ function showSection(id, event) {
     document.getElementById(id).style.display = id === 'settings' ? 'flex' : 'block';
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     event.currentTarget.classList.add('active');
+
+    if (id === 'settings') {
+        scanWiFi();
+    }
+}
+
+let isScanning = false;
+
+function scanWiFi() {
+    if (isScanning) return;
+    const scanStatus = document.getElementById('scan-status');
+    const wifiSelect = document.getElementById('wifi-select');
+    
+    if (!scanStatus || !wifiSelect) return;
+
+    isScanning = true;
+    scanStatus.style.display = 'block';
+    scanStatus.style.color = '#818cf8';
+    scanStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tìm WiFi...';
+    wifiSelect.style.display = 'none';
+
+    fetch('/scan')
+        .then(r => r.json())
+        .then(data => {
+            isScanning = false;
+            wifiSelect.innerHTML = '<option value="">-- Hoặc chọn mạng WiFi có sẵn --</option>';
+            
+            if (data.length === 0) {
+                scanStatus.style.color = '#ef4444';
+                scanStatus.innerHTML = '⚠️ Không tìm thấy mạng WiFi nào.';
+                return;
+            }
+
+            data.forEach(network => {
+                const option = document.createElement('option');
+                option.value = network.ssid;
+                option.text = network.ssid;
+                wifiSelect.appendChild(option);
+            });
+            
+            wifiSelect.style.display = 'block';
+            scanStatus.style.display = 'none';
+        })
+        .catch(err => {
+            isScanning = false;
+            scanStatus.style.color = '#ef4444';
+            scanStatus.innerHTML = '⚠️ Lỗi khi quét WiFi!';
+            console.error('Lỗi quét WiFi:', err);
+        });
 }
 
 

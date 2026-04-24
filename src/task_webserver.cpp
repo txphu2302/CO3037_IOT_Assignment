@@ -1,4 +1,5 @@
 #include "task_webserver.h"
+#include <WiFi.h>
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -87,6 +88,19 @@ void connnectWSV()
                   pump_ap_manual_override = true;
                   pump_ap_manual_state = !pump_ap_manual_state;
                   request->send(200, "text/plain", pump_ap_manual_state ? "ON" : "OFF");
+              });
+
+    server.on("/scan", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  int n = WiFi.scanNetworks();
+                  String json = "[";
+                  for (int i = 0; i < n; ++i)
+                  {
+                      if (i) json += ",";
+                      json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+                  }
+                  json += "]";
+                  request->send(200, "application/json", json);
               });
 
     server.begin();

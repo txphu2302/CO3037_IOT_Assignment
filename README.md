@@ -1,339 +1,88 @@
-# IoT Project Assignment - Task 2: NeoPixel Control (Humidity-Based)
+# IoT Project Assignment - Task 4: Web Server in Access Point Mode
 
-## Overview
-Task 2 implements a real-time humidity monitoring system that controls a NeoPixel RGB LED's color based on humidity thresholds detected by the DHT20 sensor. This task demonstrates event-driven architecture using FreeRTOS semaphores for efficient task synchronization, eliminating the need for constant polling.
+Dự án này cung cấp một giải pháp hoàn chỉnh để giám sát và điều khiển thiết bị IoT từ xa sử dụng vi điều khiển ESP32 (dòng YOLO UNO). Dự án tích hợp các công nghệ như FreeRTOS, AsyncWebServer, WebSocket và LittleFS để mang lại trải nghiệm tối ưu và tính ổn định cao.
 
----
+## 🌟 Các tính năng nổi bật
 
-## Task 2: NeoPixel RGB LED Control (Humidity-Based)
+### 1. Bảng điều khiển Web (Web Dashboard)
+- Giao diện người dùng hiện đại, thân thiện, được thiết kế với HTML/CSS/JS tĩnh và lưu trữ trực tiếp trong phân vùng `LittleFS` của ESP32.
+- **Giám sát thời gian thực:** Hiển thị trực tiếp các thông số Nhiệt độ, Độ ẩm (Cảm biến DHT20) và Độ ẩm đất.
+- **Biểu đồ động:** Vẽ biểu đồ biểu diễn sự thay đổi của dữ liệu môi trường theo thời gian thực thông qua thư viện `Chart.js`.
+- **Điều khiển thiết bị:** Hỗ trợ Bật/Tắt các thiết bị ngoại vi như Đèn LED và Máy Bơm nước.
+- **Điều khiển NeoPixel:** Tích hợp bộ chọn bảng màu (Color Palette) để điều khiển màu sắc đèn Neo Pixel RGB trực tiếp từ màn hình web.
 
-### Objective
-Monitor humidity readings from the DHT20 sensor and display real-time color changes on a NeoPixel RGB LED based on predefined humidity thresholds:
-- **Normal State (< 50%)**: Green color
-- **Warning State (50-70%)**: Yellow color  
-- **Critical State (≥ 70%)**: Red color
+### 2. Cấu hình mạng thông minh (AP Mode & WiFi Scanner)
+- **Chế độ Access Point (AP):** Khi chưa có thông tin mạng WiFi, thiết bị sẽ tự động phát ra sóng WiFi (chế độ AP) để người dùng dùng điện thoại truy cập vào thiết lập.
+- **Tự động quét WiFi (WiFi Scanner):** Ngay khi mở mục Cài đặt trên Web, mạch sẽ tự động quét các mạng WiFi (băng tần 2.4GHz) xung quanh và hiển thị trong danh sách thả xuống. Người dùng chỉ cần click chọn mà không cần phải gõ tay (SSID).
+- **Lưu cấu hình an toàn:** Hỗ trợ lưu trữ cấu hình mạng Wi-Fi và tham số máy chủ Core IoT thông qua các file dữ liệu độc lập.
 
-### Hardware Components
-| Component | GPIO Pin | Description |
-|-----------|----------|-------------|
-| NeoPixel RGB LED | GPIO 45 | WS2812B addressable RGB LED strip |
-| DHT20 Sensor | SDA: 11, SCL: 12 | Humidity & Temperature sensor via I2C |
-| Power Supply | VCC/GND | 5V for NeoPixel operation |
-
-### Hardware Configuration
-```
-ESP32-S3
-├─ GPIO 45  → NeoPixel Data Pin
-└─ GPIO 11/12 → DHT20 I2C (SDA/SCL) [shared with Task 1]
-
-```
+### 3. Kiến trúc Đa tiến trình (FreeRTOS)
+- Hệ thống hoạt động dựa trên các Task (tiến trình) chạy song song và độc lập.
+- Sử dụng **Semaphore (Binary Semaphore)** để đồng bộ hóa các sự kiện phần cứng (ví dụ: phát hiện độ ẩm vượt mức cho phép sẽ thay đổi màu NeoPixel lập tức mà không cần dùng hàm `delay`).
+- Sử dụng **Mutex** để khóa/bảo vệ dữ liệu chia sẻ (SharedContext) giữa Webserver và Cảm biến, tránh lỗi xung đột bộ nhớ.
 
 ---
 
-## Architecture
+## ⚙️ Yêu cầu phần cứng
 
-### Data Structure
-All task data is encapsulated in `SharedContext` (defined in [include/global.h](include/global.h)):
+- Bảng mạch vi điều khiển **YOLO UNO (ESP32-S3)**
+- Cảm biến Nhiệt độ / Độ ẩm **DHT20** (Giao tiếp I2C)
+- Cảm biến độ ẩm đất
+- Dây đèn/Led **NeoPixel (WS2812B)**
+- Đèn LED cơ bản và Relay (Máy bơm nước)
 
-```c
-struct SharedContext {
-    float temperature;              // Current temperature reading
-    float humidity;                 // Current humidity reading
-    SemaphoreHandle_t mutexContext;     // Mutex for thread-safe access
-    SemaphoreHandle_t semNeoUpdate;     // Binary semaphore for NeoPixel task
-    int neoState;                   // 1: Normal, 2: Warning, 3: Critical
-};
-```
+---
 
-### Task Responsibilities
+## 📁 Cấu trúc thư mục
 
-#### **1. Temperature & Humidity Monitor Task** ([src/temp_humi_monitor.cpp](src/temp_humi_monitor.cpp))
-
-This unified sensor reading task monitors both temperature (for Task 1) and humidity (for Task 2):
-
-**Task 2 Specific Logic:**
-- Reads DHT20 sensor every 5 seconds
-- Evaluates humidity against predefined thresholds
-- Determines new NeoPixel state based on humidity level
-- Updates `ctx->neoState` only when threshold boundaries are crossed
-- Signals the NeoPixel task via `semNeoUpdate` when state changes occur
-- Protects all data access with `mutexContext`
-
-**Humidity Threshold Logic:**
-```c
-int newNeoState = 1; // Default: Normal
-
-if (humidity >= 70.0) {
-    newNeoState = 3;  // Critical
-} else if (humidity >= 50.0) {
-    newNeoState = 2;  // Warning
-}
-
-// Only signal if state actually changed
-if (newNeoState != ctx->neoState) {
-    ctx->neoState = newNeoState;
-    xSemaphoreGive(ctx->semNeoUpdate);  // Wake NeoPixel task
-}
-```
-
-**Pseudo-code Flow:**
-```
-LOOP every 5 seconds:
-  1. Read humidity from DHT20
-  2. Lock mutexContext
-  3. Update ctx->humidity
-  4. Calculate newNeoState based on humidity thresholds
-  5. IF newNeoState != currentNeoState:
-       └─ Update ctx->neoState
-       └─ Give semNeoUpdate (wake NeoPixel task)
-  6. Unlock mutexContext
-  7. Sleep 5 seconds
-```
-
-#### **2. NeoPixel Control Task** ([src/neo_blinky.cpp](src/neo_blinky.cpp))
-
-Handles real-time color updates based on humidity state changes:
-
-**Key Features:**
-- Event-driven: Waits for `semNeoUpdate` notifications from monitor task
-- Responds immediately to humidity threshold changes
-- Uses Adafruit_NeoPixel library to set RGB colors
-- Thread-safe access to shared state via mutex
-- Low CPU utilization: Blocks indefinitely until signaled
-
-**Initialization Phase:**
-```c
-// 1. Initialize NeoPixel library
-Adafruit_NeoPixel strip(LED_COUNT, NEO_PIN, NEO_GRB + NEO_KHZ800);
-strip.begin();
-strip.clear();
-strip.show();
-
-// 2. Get initial state from context
-xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
-int state = ctx->neoState;
-xSemaphoreGive(ctx->mutexContext);
-
-// 3. Display initial color
-if (state == 1) strip.setPixelColor(0, strip.Color(0, 255, 0));   // Green
-else if (state == 2) strip.setPixelColor(0, strip.Color(255, 255, 0)); // Yellow
-else if (state == 3) strip.setPixelColor(0, strip.Color(255, 0, 0));   // Red
-strip.show();
-```
-
-**Main Loop:**
-```c
-while(1) {
-    // 1. Block and wait for state change signal
-    xSemaphoreTake(ctx->semNeoUpdate, portMAX_DELAY);
-    
-    // 2. Safely read current state
-    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
-    int state = ctx->neoState;
-    xSemaphoreGive(ctx->mutexContext);
-    
-    // 3. Update NeoPixel color based on state
-    if (state == 1) {
-        strip.setPixelColor(0, strip.Color(0, 255, 0));   // Green: Normal
-    } else if (state == 2) {
-        strip.setPixelColor(0, strip.Color(255, 255, 0)); // Yellow: Warning
-    } else if (state == 3) {
-        strip.setPixelColor(0, strip.Color(255, 0, 0));   // Red: Critical
-    }
-    
-    // 4. Apply changes to LED
-    strip.show();
-}
+```text
+├── data/                  # Thư mục chứa các file giao diện (Nạp vào LittleFS)
+│   ├── index.html         # Giao diện chính (Bao gồm Dashboard & Cài đặt)
+│   ├── script.js          # Logic xử lý giao diện, WebSocket, Biểu đồ và Quét WiFi
+│   ├── styles.css         # File định dạng CSS cho toàn bộ web
+│   └── chart.js           # Thư viện vẽ biểu đồ
+├── include/               # Chứa các file Header (.h)
+│   ├── global.h           # Định nghĩa SharedContext, biến toàn cục cho FreeRTOS
+│   └── ...
+├── src/                   # Chứa các file mã nguồn C/C++ thực thi chính
+│   ├── main.cpp           # Khởi tạo hệ thống và khởi chạy các Task (FreeRTOS)
+│   ├── task_webserver.cpp # Định nghĩa Web API và WebSocket handler
+│   ├── task_wifi.cpp      # Điều hướng chuyển đổi giữa AP Mode và STA Mode
+│   ├── neo_blinky.cpp     # Nhận tín hiệu điều khiển đèn NeoPixel
+│   └── temp_humi_monitor.cpp # Task đọc cảm biến DHT20 liên tục
+└── platformio.ini         # File cấu hình thư viện và board mạch của PlatformIO
 ```
 
 ---
 
-## Synchronization Mechanism
+## 🚀 Hướng dẫn cài đặt và nạp Code
 
-### FreeRTOS Primitives Used
+### 1. Môi trường phát triển
+Dự án này được tối ưu cho phần mềm **Visual Studio Code (VSCode)** cài đặt kèm tiện ích mở rộng **PlatformIO IDE**.
 
-#### **1. Binary Semaphore (`semNeoUpdate`)**
-Purpose: Signal NeoPixel task when humidity state changes
+### 2. Nạp dữ liệu giao diện Web (Upload Filesystem)
+Trang web tĩnh của dự án không nằm trong code C++ mà nằm ở bộ nhớ Flash (LittleFS). Bạn bắt buộc phải nạp nó trước:
+1. Nhấn vào biểu tượng con kiến (PlatformIO) ở thanh công cụ bên trái VSCode.
+2. Mở mục **Project Tasks** -> `env:esp32...` -> **Platform** -> Click vào **Build Filesystem Image**.
+3. Cắm mạch ESP32 vào máy tính, sau đó click vào **Upload Filesystem Image**.
 
-**Characteristics:**
-- Given (released) by monitor task when `neoState` changes
-- Taken (acquired) by NeoPixel task after waiting
-- Uses `portMAX_DELAY` timeout = blocks indefinitely until signaled
-- Prevents wasteful polling and reduces CPU load
+### 3. Nạp mã nguồn thực thi (Upload Code)
+1. Ở cạnh dưới màn hình VSCode, nhấn vào biểu tượng dấu tick **(✓)** để Build (Biên dịch) mã nguồn C++.
+2. Nhấn vào biểu tượng mũi tên sang phải **(→)** để Upload (Nạp) code vào mạch ESP32.
 
-**Flow:**
-```
-Time    Monitor Task                    NeoPixel Task
-────────────────────────────────────────────────────────
-t0      Read humidity (48%)
-        Calculate state (Normal → 1)
-        State changed!
-        Give semNeoUpdate  ──────────→  Wake up from block
-                                        xSemaphoreTake returns
-t1                                      Lock & read state
-                                        Set color = Green
-                                        Display
-t2                                      xSemaphoreTake(timeout=MAX)
-                                        Block waiting...
-```
-
-#### **2. Mutex (`mutexContext`)**
-Purpose: Protect access to shared `SharedContext` data
-
-**Protected Operations:**
-- Read/write `ctx->humidity`
-- Read/write `ctx->neoState`
-- Any modification to shared data
-
-**Usage Pattern:**
-```c
-xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
-// Critical section: Read or modify ctx->humidity, ctx->neoState
-xSemaphoreGive(ctx->mutexContext);
-```
+### 4. Cách sử dụng tính năng cấu hình Web
+1. Khởi động ESP32. Vì chưa có WiFi, nó sẽ phát ra mạng WiFi của riêng nó (Access Point).
+2. Dùng điện thoại kết nối vào mạng WiFi này (Nhớ **tắt 4G/Dữ liệu di động** để không bị lỗi không tải được trang).
+3. Mở trình duyệt web, truy cập địa chỉ IP mặc định: `192.168.4.1`.
+4. Trang web quản lý sẽ hiện ra. Bạn chuyển sang tab **⚙️ Cài đặt**. 
+5. Lúc này ESP32 sẽ tự động dò tìm các mạng WiFi 2.4GHz ở xung quanh và hiện danh sách. Chọn WiFi nhà bạn, nhập mật khẩu rồi bấm nút **Lưu cấu hình**.
+6. Mạch sẽ tự động lưu lại, tắt trạm phát (AP) và kết nối với Router WiFi nhà bạn như một thiết bị IoT bình thường (Chế độ STA).
 
 ---
 
-## Implementation Details
-
-### NeoPixel Library: Adafruit_NeoPixel
-
-The implementation uses the **Adafruit_NeoPixel** library for controlling WS2812B RGB LEDs:
-
-```cpp
-// Initialization
-Adafruit_NeoPixel strip(LED_COUNT, NEO_PIN, NEO_GRB + NEO_KHZ800);
-strip.begin();  // Initialize library and GPIO
-
-// Setting color
-strip.setPixelColor(pixelIndex, color);
-
-// Displaying changes
-strip.show();   // Transmit color data to LED
-
-// Color definition
-uint32_t color = strip.Color(red, green, blue);  // RGB values 0-255
-```
-
-### Color Mapping & RGB Values
-
-| State | Condition | Color | RGB Value | Meaning |
-|-------|-----------|-------|-----------|---------|
-| 1 | humidity < 50% | Green | (0, 255, 0) | Normal/Healthy |
-| 2 | 50% ≤ humidity < 70% | Yellow | (255, 255, 0) | Warning/Caution |
-| 3 | humidity ≥ 70% | Red | (255, 0, 0) | Critical/Alert |
-
-**Color Selection Rationale:**
-- **Green** → Universal symbol for "all clear" or normal conditions
-- **Yellow** → Warning indicator, needs attention
-- **Red** → Critical alert, immediate action required
-- Standard in monitoring dashboards and industrial systems
-
-### Humidity Thresholds
-
-```
-         0% ─────────────── 50% ─────────────── 70% ─────── 100%
-         │                  │                  │
-      [Normal: Green]   [Warning: Yellow]  [Critical: Red]
-         │                  │                  │
-         └──────────────────┴──────────────────┘
-                   Humidity Scale
-```
-
-**Threshold Logic:**
-- **Normal**: humidity < 50% (dry conditions)
-- **Warning**: 50% ≤ humidity < 70% (moderate humidity)
-- **Critical**: humidity ≥ 70% (high humidity, potential condensation)
-
----
-
-
-
-## State Transition Diagram
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                  Humidity Monitor                         │
-│              (reads DHT20 every 5s)                       │
-└──────────────┬───────────────────────────────────────────┘
-               │
-               ↓
-        ┌─────────────────────────────────────┐
-        │     Evaluate Humidity Thresholds    │
-        └────────┬──────────────────┬─────────┘
-                 │                  │
-        ┌────────▼─────┐    ┌──────▼──────┐
-        │State Changed? │    │No Change    │
-        └────────┬─────┘    │ Skip Signal  │
-                 │          └─────────────┘
-                 │ YES
-    ┌────────────▼────────────────┐
-    │ Give semNeoUpdate           │
-    │ (Wake NeoPixel Task)        │
-    └────────┬─────────────────────┘
-             │
-             ↓
-    ┌──────────────────────────────┐
-    │  NeoPixel Control Task       │
-    │ (woken by semaphore signal)  │
-    └────────┬──────────────────────┘
-             │
-    ┌────────▼─────────────────────┐
-    │  Read neoState              │
-    │  (with mutex protection)    │
-    └────────┬──────────────────────┘
-             │
-    ┌────────▼─────────────────────┐
-    │  Set Color Based on State:  │
-    │  1 → Green                  │
-    │  2 → Yellow                 │
-    │  3 → Red                    │
-    └────────┬──────────────────────┘
-             │
-    ┌────────▼─────────────────────┐
-    │  Display Color on NeoPixel  │
-    │  strip.show()               │
-    └────────┬──────────────────────┘
-             │
-    ┌────────▼──────────────────────┐
-    │ Return to Wait State          │
-    │ (portMAX_DELAY)               │
-    └───────────────────────────────┘
-```
-
----
-
-
-## File Structure
-
-```
-src/
-├── temp_humi_monitor.cpp    # Sensor reading + Task 1 & Task 2 logic
-├── led_blinky.cpp           # Task 1: LED control (temperature)
-├── neo_blinky.cpp           # Task 2: NeoPixel control (humidity)
-└── main.cpp                 # FreeRTOS initialization & task creation
-
-include/
-├── global.h                 # SharedContext & semaphore declarations
-├── temp_humi_monitor.h      # Monitor task declaration
-├── led_blinky.h             # LED task declaration
-└── neo_blinky.h             # NeoPixel task declaration (GPIO 45, LED_COUNT=1)
-
-lib/
-├── DHT20/                   # DHT20 temperature/humidity sensor driver
-├── Adafruit_NeoPixel/       # Adafruit NeoPixel control library
-└── ... (other libraries)
-```
-
----
-
-
-## References
-
-- [FreeRTOS Documentation](https://www.freertos.org/)
-- [FreeRTOS Binary Semaphores](https://www.freertos.org/Embedded-RTOS-Binary-Semaphores.html)
-- [Adafruit NeoPixel Library](https://github.com/adafruit/Adafruit_NeoPixel)
-- [ESP32 Technical Reference](https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf)
-- [PlatformIO Documentation](https://docs.platformio.org/)
-
-
+## 🔧 Tính năng tự động hóa cục bộ (Task 2)
+Bên cạnh việc điều khiển qua Web, thiết bị hoạt động như một hệ thống cảnh báo môi trường tự động (Đồng bộ bằng FreeRTOS Semaphore):
+- **Bình thường (Độ ẩm < 50%):** Đèn NeoPixel sáng màu Xanh lá.
+- **Cảnh báo (Độ ẩm 50% - 70%):** Đèn NeoPixel chuyển sang màu Vàng.
+- **Nguy hiểm (Độ ẩm ≥ 70%):** Đèn NeoPixel chuyển sang màu Đỏ.
+*(Logic này phản ứng tức thời theo thời gian thực mà không bị ảnh hưởng bởi đường truyền mạng).*
