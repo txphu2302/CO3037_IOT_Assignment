@@ -47,7 +47,7 @@ void connnectWSV()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(LittleFS, "/test.html", "text/html"); });
+              { request->send(LittleFS, "/index.html", "text/html"); });
     server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/script.js", "application/javascript"); });
     server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -70,9 +70,13 @@ void connnectWSV()
                           neo_ap_color_g = number >> 8 & 0xFF;
                           neo_ap_color_b = number & 0xFF;
                       }
+                      // Nếu có gửi màu thì luôn luôn BẬT
+                      neo_ap_manual_state = true;
+                  } else {
+                      // Nếu không gửi màu thì TẮT/BẬT tuần tự
+                      neo_ap_manual_state = !neo_ap_manual_state;
                   }
                   neo_ap_manual_override = true;
-                  neo_ap_manual_state = !neo_ap_manual_state;
                   request->send(200, "text/plain", neo_ap_manual_state ? "ON" : "OFF");
               });
 

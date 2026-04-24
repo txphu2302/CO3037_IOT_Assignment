@@ -17,8 +17,9 @@
 void setup()
 {
   Serial.begin(115200);
+  //LittleFS.begin(true); LittleFS.remove("/info.dat"); ESP.restart();
   check_info_File(0);
-
+  
   SharedContext* ctx = new SharedContext();
   ctx->temperature = 0;
   ctx->humidity = 0;

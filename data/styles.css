@@ -78,11 +78,17 @@ body {
   transition   : transform 0.3s ease;
 }
 
-#gauge_temp,
-#gauge_humi {
-  width : 260px;
-  height: 260px;
-  margin: 0 auto;
+.value-display {
+  font-size: 64px;
+  font-weight: 700;
+  color: #ff5722;
+  margin-top: 40px;
+  text-shadow: 2px 2px 8px rgba(255, 87, 34, 0.2);
+}
+
+.value-display.humi {
+  color: #03a9f4;
+  text-shadow: 2px 2px 8px rgba(3, 169, 244, 0.2);
 }
 
 /* Device Page */
@@ -140,6 +146,28 @@ body {
   right   : 12px;
   color   : #e74c3c;
   cursor  : pointer;
+}
+
+.color-palette {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+  border-color: #333;
 }
 
 .add-relay-btn {

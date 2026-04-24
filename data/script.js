@@ -39,7 +39,14 @@ function onMessage(event) {
     console.log("📩 Nhận:", event.data);
     try {
         var data = JSON.parse(event.data);
-        // Có thể thêm xử lý riêng nếu cần (ví dụ cập nhật trạng thái)
+        if (data.temperature !== undefined) {
+            const tempEl = document.getElementById("temp_value");
+            if (tempEl) tempEl.innerText = data.temperature;
+        }
+        if (data.humidity !== undefined) {
+            const humiEl = document.getElementById("humi_value");
+            if (humiEl) humiEl.innerText = data.humidity;
+        }
     } catch (e) {
         console.warn("Không phải JSON hợp lệ:", event.data);
     }
@@ -47,9 +54,6 @@ function onMessage(event) {
 
 
 // ==================== UI NAVIGATION ====================
-let relayList = [];
-let deleteTarget = null;
-
 function showSection(id, event) {
     document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
     document.getElementById(id).style.display = id === 'settings' ? 'flex' : 'block';
@@ -58,125 +62,67 @@ function showSection(id, event) {
 }
 
 
-// ==================== HOME GAUGES ====================
-window.onload = function () {
-    const gaugeTemp = new JustGage({
-        id: "gauge_temp",
-        value: 26,
-        min: -10,
-        max: 50,
-        donut: true,
-        pointer: false,
-        gaugeWidthScale: 0.25,
-        gaugeColor: "transparent",
-        levelColorsGradient: true,
-        levelColors: ["#00BCD4", "#4CAF50", "#FFC107", "#F44336"]
-    });
-
-    const gaugeHumi = new JustGage({
-        id: "gauge_humi",
-        value: 60,
-        min: 0,
-        max: 100,
-        donut: true,
-        pointer: false,
-        gaugeWidthScale: 0.25,
-        gaugeColor: "transparent",
-        levelColorsGradient: true,
-        levelColors: ["#42A5F5", "#00BCD4", "#0288D1"]
-    });
-
-    setInterval(() => {
-        gaugeTemp.refresh(Math.floor(Math.random() * 15) + 20);
-        gaugeHumi.refresh(Math.floor(Math.random() * 40) + 40);
-    }, 3000);
-};
-
-
 // ==================== DEVICE FUNCTIONS ====================
-function openAddRelayDialog() {
-    document.getElementById('addRelayDialog').style.display = 'flex';
-}
-function closeAddRelayDialog() {
-    document.getElementById('addRelayDialog').style.display = 'none';
-}
-function saveRelay() {
-    const name = document.getElementById('relayName').value.trim();
-    const gpio = document.getElementById('relayGPIO').value.trim();
-    if (!name || !gpio) return alert("⚠️ Please fill all fields!");
-    relayList.push({ id: Date.now(), name, gpio, state: false });
-    renderRelays();
-    closeAddRelayDialog();
-}
-function renderRelays() {
-    const container = document.getElementById('relayContainer');
-    container.innerHTML = "";
-    relayList.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'device-card';
-        card.innerHTML = `
-      <i class="fa-solid fa-bolt device-icon"></i>
-      <h3>${r.name}</h3>
-      <p>GPIO: ${r.gpio}</p>
-      <button class="toggle-btn ${r.state ? 'on' : ''}" onclick="toggleRelay(${r.id})">
-        ${r.state ? 'ON' : 'OFF'}
-      </button>
-      <i class="fa-solid fa-trash delete-icon" onclick="showDeleteDialog(${r.id})"></i>
-    `;
-        container.appendChild(card);
-    });
-}
-function toggleRelay(id) {
-    const relay = relayList.find(r => r.id === id);
-    if (relay) {
-        relay.state = !relay.state;
-        const relayJSON = JSON.stringify({
-            page: "device",
-            value: {
-                name: relay.name,
-                status: relay.state ? "ON" : "OFF",
-                gpio: relay.gpio
-            }
+function toggleLED() {
+    const btn = document.getElementById("btnToggleLED");
+    btn.innerText = "Đang đổi...";
+    fetch('/toggle-led')
+        .then(r => r.text())
+        .then(msg => {
+            btn.className = msg === "ON" ? "toggle-btn on" : "toggle-btn";
+            btn.innerText = msg;
+        })
+        .catch(err => {
+            btn.innerText = "Lỗi!";
+            console.error(err);
         });
-        Send_Data(relayJSON);
-        renderRelays();
-    }
 }
-function showDeleteDialog(id) {
-    deleteTarget = id;
-    document.getElementById('confirmDeleteDialog').style.display = 'flex';
+
+function toggleNeo() {
+    const btn = document.getElementById("btnToggleNeo");
+    btn.innerText = "Đang đổi...";
+    fetch('/toggle-neo')
+        .then(r => r.text())
+        .then(msg => {
+            btn.className = msg === "ON" ? "toggle-btn on" : "toggle-btn";
+            btn.innerText = msg;
+        })
+        .catch(err => {
+            btn.innerText = "Lỗi!";
+            console.error(err);
+        });
 }
-function closeConfirmDelete() {
-    document.getElementById('confirmDeleteDialog').style.display = 'none';
-}
-function confirmDelete() {
-    relayList = relayList.filter(r => r.id !== deleteTarget);
-    renderRelays();
-    closeConfirmDelete();
+
+function changeNeoColor(colorHex) {
+    const btn = document.getElementById("btnToggleNeo");
+    fetch(`/toggle-neo?color=${encodeURIComponent(colorHex)}`)
+        .then(r => r.text())
+        .then(msg => {
+            btn.className = msg === "ON" ? "toggle-btn on" : "toggle-btn";
+            btn.innerText = msg;
+        })
+        .catch(err => console.error(err));
 }
 
 
-// ==================== SETTINGS FORM (BỔ SUNG) ====================
+// ==================== SETTINGS FORM ====================
 document.getElementById("settingsForm").addEventListener("submit", function (e) {
     e.preventDefault();
 
     const ssid = document.getElementById("ssid").value.trim();
     const password = document.getElementById("password").value.trim();
-    const token = document.getElementById("token").value.trim();
-    const server = document.getElementById("server").value.trim();
-    const port = document.getElementById("port").value.trim();
 
     const settingsJSON = JSON.stringify({
         page: "setting",
         value: {
             ssid: ssid,
             password: password,
-            token: token,
-            server: server,
-            port: port
+            token: "",
+            server: "",
+            port: ""
         }
     });
 
     Send_Data(settingsJSON);
-    alert("✅ Cấu hình đã được gửi đến thiết bị!");
+    alert("✅ Cấu hình Wi-Fi đã được gửi đến thiết bị!");
 });
