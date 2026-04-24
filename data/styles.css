@@ -91,6 +91,17 @@ body {
   text-shadow: 2px 2px 8px rgba(3, 169, 244, 0.2);
 }
 
+.value-display.soil {
+  color: #4caf50;
+  text-shadow: 2px 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+.value-display.status {
+  font-size: 42px;
+  color: #888;
+  text-shadow: 2px 2px 8px rgba(136, 136, 136, 0.2);
+}
+
 /* Device Page */
 .device-list {
   display        : flex;
@@ -98,6 +109,21 @@ body {
   gap            : 25px;
   margin-top     : 30px;
   justify-content: center;
+}
+
+/* Real-time Chart */
+.chart-container {
+  background   : white;
+  border-radius: 20px;
+  box-shadow   : 0 10px 25px rgba(0, 0, 0, 0.1);
+  padding      : 30px;
+  margin-top   : 40px;
+  width        : 100%;
+  max-width    : 1000px;
+  height       : 400px;
+  margin-left  : auto;
+  margin-right : auto;
+  position     : relative;
 }
 
 .device-card {

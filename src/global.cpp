@@ -21,3 +21,5 @@ bool neo_ap_manual_state = false;
 uint8_t neo_ap_color_r = 255;
 uint8_t neo_ap_color_g = 0;
 uint8_t neo_ap_color_b = 0;
+bool pump_ap_manual_override = false;
+bool pump_ap_manual_state = false;

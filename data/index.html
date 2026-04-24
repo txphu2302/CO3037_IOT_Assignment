@@ -11,6 +11,7 @@
 
   <!-- Thư viện -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 
@@ -49,6 +50,21 @@
           <h2>💧 Độ ẩm (%)</h2>
           <div class="value-display humi" id="humi_value">--</div>
         </div>
+
+        <div class="gauge-card">
+          <h2>🌱 Độ ẩm đất (%)</h2>
+          <div class="value-display soil" id="soil_value">--</div>
+        </div>
+
+        <div class="gauge-card">
+          <h2>🔔 Trạng thái hệ thống</h2>
+          <div class="value-display status" id="sys_status">--</div>
+        </div>
+      </div>
+
+      <!-- Biểu đồ thời gian thực -->
+      <div class="chart-container fade-in">
+        <canvas id="envChart"></canvas>
       </div>
     </div>
 
@@ -65,6 +81,13 @@
           <i class="fa-solid fa-lightbulb device-icon"></i>
           <h3>Đèn LED</h3>
           <button id="btnToggleLED" class="toggle-btn" onclick="toggleLED()">OFF</button>
+        </div>
+
+        <!-- Nút điều khiển Máy Bơm -->
+        <div class="device-card">
+          <i class="fa-solid fa-droplet device-icon"></i>
+          <h3>Máy Bơm</h3>
+          <button id="btnTogglePump" class="toggle-btn" onclick="togglePump()">OFF</button>
         </div>
 
         <!-- Nút điều khiển Neo Pixel -->

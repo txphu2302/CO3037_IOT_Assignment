@@ -90,8 +90,18 @@ void temp_humi_monitor(void *pvParameters){
         Serial.print(temperature);
         Serial.println("°C");
 
+        String statusStr = "Unknown";
+        if (pvParameters != NULL) {
+            SharedContext* ctx = (SharedContext*)pvParameters;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            statusStr = statusText(ctx->lcdState);
+            xSemaphoreGive(ctx->mutexContext);
+        }
+
         // Gửi dữ liệu qua WebSocket cho frontend cập nhật
-        String jsonStr = "{\"temperature\":" + String(temperature, 2) + ",\"humidity\":" + String(humidity, 2) + "}";
+        String jsonStr = "{\"temperature\":" + String(temperature, 2) + 
+                         ",\"humidity\":" + String(humidity, 2) + 
+                         ",\"system_status\":\"" + statusStr + "\"}";
         Webserver_sendata(jsonStr);
 
         lcd.setCursor(0,0);

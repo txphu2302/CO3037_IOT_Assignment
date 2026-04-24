@@ -52,6 +52,8 @@ void connnectWSV()
               { request->send(LittleFS, "/script.js", "application/javascript"); });
     server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/styles.css", "text/css"); });
+    server.on("/chart.js", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(LittleFS, "/chart.js", "application/javascript"); });
 
     server.on("/toggle-led", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -78,6 +80,13 @@ void connnectWSV()
                   }
                   neo_ap_manual_override = true;
                   request->send(200, "text/plain", neo_ap_manual_state ? "ON" : "OFF");
+              });
+
+    server.on("/toggle-pump", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  pump_ap_manual_override = true;
+                  pump_ap_manual_state = !pump_ap_manual_state;
+                  request->send(200, "text/plain", pump_ap_manual_state ? "ON" : "OFF");
               });
 
     server.begin();
