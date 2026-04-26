@@ -1,0 +1,132 @@
+<!DOCTYPE HTML>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLO UNO - STA MODE</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Thư viện -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="sta-mode">
+
+  <!-- Thanh bên -->
+  <div class="sidebar">
+    <div class="logo-container">
+      <div class="yolo-logo"><i class="fa-solid fa-bolt"></i> YOLO<span>UNO</span></div>
+    </div>
+
+    <div class="nav-item active" onclick="showSection('home', event)">🏠 <span>Trang chủ</span></div>
+    <div class="nav-item" onclick="showSection('device', event)">⚡ <span>Thiết bị</span></div>
+    <div class="nav-item" onclick="showSection('settings', event)">⚙️ <span>Cài đặt</span></div>
+  </div>
+
+  <!-- Nội dung chính -->
+  <div class="main-content">
+
+    <!-- TRANG CHỦ -->
+    <div id="home" class="section fade-in">
+      <header>
+        <h1>Bảng điều khiển môi trường</h1>
+        <p>Giám sát thông số theo thời gian thực</p>
+      </header>
+
+      <div class="gauges-container">
+        <div class="gauge-card">
+          <h2>🌡️ Nhiệt độ (°C)</h2>
+          <div class="value-display" id="temp_value">--</div>
+        </div>
+
+        <div class="gauge-card">
+          <h2>💧 Độ ẩm (%)</h2>
+          <div class="value-display humi" id="humi_value">--</div>
+        </div>
+
+        <div class="gauge-card">
+          <h2>🌱 Độ ẩm đất (%)</h2>
+          <div class="value-display soil" id="soil_value">--</div>
+        </div>
+
+        <div class="gauge-card">
+          <h2>🔔 Trạng thái hệ thống</h2>
+          <div class="value-display status" id="sys_status">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- THIẾT BỊ -->
+    <div id="device" class="section" style="display:none;">
+      <header>
+        <h1>Điều khiển Thiết bị</h1>
+        <p>Bật/tắt LED và Neo Pixel.</p>
+      </header>
+
+      <div class="device-list" id="deviceContainer">
+        <!-- Nút điều khiển LED -->
+        <div class="device-card">
+          <i class="fa-solid fa-lightbulb device-icon"></i>
+          <h3>Đèn LED</h3>
+          <button id="btnToggleLED" class="toggle-btn" onclick="toggleLED()">OFF</button>
+        </div>
+
+        <!-- Nút điều khiển Neo Pixel -->
+        <div class="device-card">
+          <i class="fa-solid fa-palette device-icon"></i>
+          <h3>Neo Pixel</h3>
+          <button id="btnToggleNeo" class="toggle-btn" onclick="toggleNeo()" style="margin-bottom: 15px;">OFF</button>
+          
+          <label style="display:block; margin-bottom: 8px; font-size: 14px; font-weight:600; color:#555;">Bảng màu có sẵn:</label>
+          <div class="color-palette">
+            <div class="color-swatch" style="background-color: #ff0000;" onclick="changeNeoColor('#ff0000')" title="Đỏ"></div>
+            <div class="color-swatch" style="background-color: #00ff00;" onclick="changeNeoColor('#00ff00')" title="Xanh lá"></div>
+            <div class="color-swatch" style="background-color: #0000ff;" onclick="changeNeoColor('#0000ff')" title="Xanh dương"></div>
+            <div class="color-swatch" style="background-color: #ffff00;" onclick="changeNeoColor('#ffff00')" title="Vàng"></div>
+            <div class="color-swatch" style="background-color: #ff00ff;" onclick="changeNeoColor('#ff00ff')" title="Tím"></div>
+            <div class="color-swatch" style="background-color: #00ffff;" onclick="changeNeoColor('#00ffff')" title="Xanh dương nhạt"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CÀI ĐẶT -->
+    <div id="settings" class="section settings-section" style="display:none;">
+      <div class="settings-card">
+        <h2><i class="fa-solid fa-gear"></i> Cấu hình thiết bị</h2>
+        <p>Nhập thông tin kết nối Core IoT của bạn bên dưới.</p>
+
+        <form id="settingsForm">
+          <div class="input-group" style="margin-bottom: 8px;">
+            <i class="fa-solid fa-key"></i>
+            <input type="text" id="mqtt_token" placeholder="Token Core IoT" required>
+          </div>
+
+          <div class="input-group" style="margin-bottom: 8px;">
+            <i class="fa-solid fa-server"></i>
+            <input type="text" id="mqtt_server" placeholder="Máy chủ (VD: app.coreiot.io)" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fa-solid fa-network-wired"></i>
+            <input type="number" id="mqtt_port" placeholder="Cổng (VD: 1883)" required>
+          </div>
+
+          <button type="submit" class="btn-save">
+            <i class="fa-solid fa-floppy-disk"></i> Kết nối
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script src="script.js"></script>
+</body>
+
+</html>

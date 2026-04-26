@@ -1,5 +1,6 @@
 #include "task_webserver.h"
 #include <WiFi.h>
+#include "coreiot.h"
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -48,7 +49,13 @@ void connnectWSV()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(LittleFS, "/index.html", "text/html"); });
+              {
+                  if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+                      request->send(LittleFS, "/AP.html", "text/html");
+                  } else {
+                      request->send(LittleFS, "/STA.html", "text/html");
+                  }
+              });
     server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/script.js", "application/javascript"); });
     server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -61,6 +68,13 @@ void connnectWSV()
                   led_ap_manual_override = true;
                   led_ap_manual_state = !led_ap_manual_state;
                   request->send(200, "text/plain", led_ap_manual_state ? "ON" : "OFF");
+                  
+                  // Đồng bộ cho các tab Web khác
+                  String wsMsg = "{\"led\":\"" + String(led_ap_manual_state ? "ON" : "OFF") + "\"}";
+                  Webserver_sendata(wsMsg);
+
+                  // Đồng bộ lên CoreIOT
+                  coreiot_publish_attribute("ledState", led_ap_manual_state);
               });
 
     server.on("/toggle-neo", HTTP_GET, [](AsyncWebServerRequest *request)

@@ -6,6 +6,22 @@ body {
   background-color: #eef2f7;
 }
 
+body.sta-mode {
+  font-family     : "Inter", "Poppins", Arial, sans-serif;
+  background      : radial-gradient(circle at top right, #1e293b, #0f172a);
+  color           : #f8fafc;
+}
+
+body.sta-mode::before {
+  content: "";
+  position: absolute;
+  top: -20%; right: -10%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15), transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
 /* Sidebar */
 .sidebar {
   width           : 260px;
@@ -15,6 +31,43 @@ body {
   flex-direction  : column;
   align-items     : center;
   box-shadow      : 3px 0 10px rgba(0, 0, 0, 0.2);
+  z-index         : 10;
+}
+
+.sta-mode .sidebar {
+  background      : rgba(15, 23, 42, 0.6);
+  backdrop-filter : blur(20px);
+  border-right    : 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow      : 5px 0 25px rgba(0, 0, 0, 0.5);
+}
+
+.sta-mode .logo-container {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sta-mode .yolo-logo {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4), 0 0 20px rgba(56, 189, 248, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sta-mode .yolo-logo span {
+  color: #38bdf8;
+  font-weight: 300;
+  text-shadow: none;
+}
+
+.sta-mode .yolo-logo i {
+  color: #fb923c;
+  font-size: 24px;
+  filter: drop-shadow(0 0 8px rgba(251, 146, 60, 0.6));
 }
 
 .logo-container {
@@ -53,6 +106,32 @@ body {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
+.sta-mode .nav-item {
+  color: #94a3b8;
+}
+.sta-mode .nav-item:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sta-mode .nav-item.active {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.15), transparent);
+  color     : #38bdf8;
+  border-left: 4px solid #38bdf8;
+  border-radius: 0 12px 12px 0;
+  box-shadow: none;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+.sta-mode header h1 {
+  color: #f8fafc;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.sta-mode header p {
+  color: #94a3b8;
+}
+
 /* Main Content */
 .main-content {
   flex      : 1;
@@ -71,16 +150,33 @@ body {
 
 .gauge-card {
   background   : white;
-  border-radius: 16px;
-  box-shadow   : 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  box-shadow   : 0 8px 20px rgba(0, 0, 0, 0.05);
   padding      : 25px 15px;
   text-align   : center;
-  transition   : transform 0.3s ease;
+  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position     : relative;
+  overflow     : hidden;
+  border       : 1px solid rgba(0,0,0,0.02);
 }
 
+.gauge-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #ece9e6, #ffffff);
+}
+
+/* Thêm màu viền trên cho từng thẻ */
+.gauge-card:nth-child(1)::before { background: linear-gradient(90deg, #ff9966, #ff5e62); } /* Nhiệt độ */
+.gauge-card:nth-child(2)::before { background: linear-gradient(90deg, #36D1DC, #5B86E5); } /* Độ ẩm */
+.gauge-card:nth-child(3)::before { background: linear-gradient(90deg, #11998e, #38ef7d); } /* Đất */
+.gauge-card:nth-child(4)::before { background: linear-gradient(90deg, #8E54E9, #4776E6); } /* Trạng thái */
+
 .gauge-card:hover {
-  transform : translateY(-5px);
-  box-shadow: 0 8px 25px rgba(34, 148, 242, 0.2);
+  transform : translateY(-8px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
 .gauge-card h2 {
@@ -91,6 +187,8 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+.sta-mode .gauge-card h2 { color: #cbd5e1; font-weight: 500; font-size: 15px; }
 
 .value-display {
   font-size: 42px;
@@ -114,7 +212,23 @@ body {
   font-size: 26px;
   color: #888;
   text-shadow: 1px 1px 5px rgba(136, 136, 136, 0.2);
-  margin-top: 20px;
+  margin-top: 15px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  display: inline-block;
+  background: #f4f6f9;
+}
+
+/* Chỉnh màu Neon cho Text ở STA mode */
+.sta-mode .value-display { color: #fb923c; text-shadow: 0 0 15px rgba(251, 146, 60, 0.4); }
+.sta-mode .value-display.humi { color: #38bdf8; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+.sta-mode .value-display.soil { color: #4ade80; text-shadow: 0 0 15px rgba(74, 222, 128, 0.4); }
+.sta-mode .value-display.status { 
+  background: rgba(147, 51, 234, 0.1); 
+  color: #c084fc; 
+  text-shadow: 0 0 10px rgba(192, 132, 252, 0.4);
+  border: 1px solid rgba(192, 132, 252, 0.2);
 }
 
 /* Device Page */
@@ -144,41 +258,92 @@ body {
 .device-card {
   background   : #fff;
   border-radius: 20px;
-  box-shadow   : 0 5px 20px rgba(0, 0, 0, 0.1);
-  width        : 240px;
-  padding      : 25px 20px;
+  box-shadow   : 0 8px 20px rgba(0, 0, 0, 0.05);
+  width        : 260px;
+  padding      : 30px 25px;
   text-align   : center;
   position     : relative;
-  transition   : all 0.3s ease;
+  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border       : 1px solid rgba(0,0,0,0.03);
 }
 
 .device-card:hover {
-  transform : translateY(-5px);
-  box-shadow: 0 8px 25px rgba(34, 148, 242, 0.25);
+  transform : translateY(-8px);
+  box-shadow: 0 15px 35px rgba(34, 148, 242, 0.15);
 }
 
-.device-icon {
-  font-size    : 36px;
-  color        : #2294F2;
-  margin-bottom: 10px;
+.sta-mode .device-card {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-radius: 24px;
+}
+
+.sta-mode .device-card:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.1);
+}
+
+.sta-mode .device-icon {
+  color: #38bdf8;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.6));
+}
+
+.sta-mode .device-card h3 {
+  color: #f8fafc;
+}
+
+.sta-mode .toggle-btn {
+  background: rgba(15, 23, 42, 0.6);
+  color: #94a3b8;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.sta-mode .toggle-btn.on {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
+  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+.sta-mode label {
+  color: #cbd5e1 !important;
+}
+  font-size    : 42px;
+  color        : #2a5298;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 4px 6px rgba(42, 82, 152, 0.3));
+}
+
+.device-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #444;
 }
 
 .toggle-btn {
   width        : 100%;
   border       : none;
   border-radius: 12px;
-  padding      : 12px;
+  padding      : 14px;
   font-weight  : 600;
   font-size    : 16px;
   cursor       : pointer;
-  background   : #e3e3e3;
-  transition   : 0.3s;
+  background   : #f1f3f5;
+  color        : #555;
+  transition   : all 0.3s;
+  box-shadow   : inset 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .toggle-btn.on {
-  background: linear-gradient(90deg, #2294F2, #1b7fe0);
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
   color     : white;
-  box-shadow: 0 4px 12px rgba(34, 148, 242, 0.4);
+  box-shadow: 0 8px 15px rgba(0, 114, 255, 0.3);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
 .delete-icon {
@@ -247,23 +412,56 @@ body {
 .settings-card {
   background   : white;
   padding      : 50px 60px;
-  border-radius: 20px;
-  box-shadow   : 0 10px 25px rgba(0, 0, 0, 0.15);
+  border-radius: 24px;
+  box-shadow   : 0 15px 40px rgba(0, 0, 0, 0.08);
   width        : 850px;
-  /* ✅ to hơn */
   max-width    : 95%;
   text-align   : center;
+  border       : 1px solid rgba(0,0,0,0.03);
 }
 
-.settings-card h2 {
-  color        : #2294F2;
+.sta-mode .settings-card {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  border-radius: 30px;
+}
+
+.sta-mode .settings-card h2 {
+  color: #38bdf8;
+  text-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+}
+
+.sta-mode .settings-card p {
+  color: #94a3b8;
+}
+
+.sta-mode .input-group i {
+  color: #38bdf8;
+}
+
+.sta-mode .input-group input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #f8fafc;
+}
+
+.sta-mode .input-group input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+  background: rgba(15, 23, 42, 0.8);
+}
+  color        : #2a5298;
+  font-weight  : 700;
+  font-size    : 28px;
   margin-bottom: 15px;
 }
 
 .settings-card p {
-  color        : #666;
+  color        : #777;
   margin-bottom: 35px;
-  font-size    : 15px;
+  font-size    : 16px;
 }
 
 /* FORM STYLE — vertical layout with spacing */
@@ -329,6 +527,26 @@ body {
 .btn-save:hover {
   transform : translateY(-2px);
   box-shadow: 0 8px 22px rgba(34, 148, 242, 0.55);
+}
+
+.sta-mode .btn-save {
+  margin-top   : 35px;
+  background   : linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 16px;
+  padding      : 18px 50px;
+  font-weight  : 700;
+  color        : #fff;
+  border       : 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow   : 0 0 20px rgba(16, 185, 129, 0.4);
+  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.sta-mode .btn-save:hover {
+  transform : translateY(-4px) scale(1.02);
+  box-shadow: 0 0 30px rgba(16, 185, 129, 0.6);
+  background   : linear-gradient(135deg, #34d399 0%, #10b981 100%);
 }
 
 

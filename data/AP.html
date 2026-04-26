@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bảng điều khiển YOLO UNO</title>
+  <title>YOLO UNO - AP MODE</title>
 
   <!-- CSS -->
   <link rel="stylesheet" href="styles.css">
@@ -37,7 +37,7 @@
     <div id="home" class="section fade-in">
       <header>
         <h1>Bảng điều khiển môi trường</h1>
-        <p>Giám sát nhiệt độ và độ ẩm theo thời gian thực</p>
+        <p>Giám sát nhiệt độ, độ ẩm và độ ẩm đất theo thời gian thực</p>
       </header>
 
       <div class="gauges-container">
@@ -72,7 +72,7 @@
     <div id="device" class="section" style="display:none;">
       <header>
         <h1>Điều khiển Thiết bị</h1>
-        <p>Bật/tắt LED và Neo Pixel.</p>
+        <p>Bật/tắt LED | Neo Pixel | Máy bơm.</p>
       </header>
 
       <div class="device-list" id="deviceContainer">
@@ -113,7 +113,7 @@
     <div id="settings" class="section settings-section" style="display:none;">
       <div class="settings-card">
         <h2><i class="fa-solid fa-gear"></i> Cấu hình thiết bị</h2>
-        <p>Nhập thông tin Wi-Fi và kết nối Core IoT của bạn bên dưới.</p>
+        <p>Nhập thông tin Wi-Fi của bạn bên dưới.</p>
 
         <form id="settingsForm">
           <div class="input-group" style="margin-bottom: 8px;">
@@ -121,7 +121,7 @@
             <input type="text" id="ssid" placeholder="Tên Wi-Fi (SSID)" required>
           </div>
           <select id="wifi-select" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; background: #f9f9f9; outline: none; font-family: inherit; display: none;" onchange="if(this.value) document.getElementById('ssid').value = this.value;">
-            <option value="">-- Hoặc chọn mạng WiFi có sẵn --</option>
+            <option value="">-- chọn mạng WiFi có sẵn --</option>
           </select>
           <p id="scan-status" style="font-size: 0.85rem; color: #818cf8; margin: -5px 0 15px 0; text-align: left; display: none;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tìm WiFi...</p>
 
@@ -131,7 +131,7 @@
           </div>
 
           <button type="submit" class="btn-save">
-            <i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình
+            <i class="fa-solid fa-floppy-disk"></i> Kết nối
           </button>
         </form>
       </div>

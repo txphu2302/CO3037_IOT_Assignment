@@ -97,6 +97,13 @@ function onMessage(event) {
             const tempEl = document.getElementById("temp_value");
             if (tempEl) tempEl.innerText = latestTemp;
         }
+        if (data.led !== undefined) {
+            const btn = document.getElementById("btnToggleLED");
+            if (btn) {
+                btn.className = data.led === "ON" ? "toggle-btn on" : "toggle-btn";
+                btn.innerText = data.led;
+            }
+        }
         if (data.humidity !== undefined) {
             latestHumi = data.humidity;
             const humiEl = document.getElementById("humi_value");
@@ -267,20 +274,46 @@ function changeNeoColor(colorHex) {
 document.getElementById("settingsForm").addEventListener("submit", function (e) {
     e.preventDefault();
 
-    const ssid = document.getElementById("ssid").value.trim();
-    const password = document.getElementById("password").value.trim();
+    const ssidInput = document.getElementById("ssid");
+    const mqttTokenInput = document.getElementById("mqtt_token");
 
-    const settingsJSON = JSON.stringify({
-        page: "setting",
-        value: {
-            ssid: ssid,
-            password: password,
-            token: "",
-            server: "",
-            port: ""
-        }
-    });
+    if (ssidInput) {
+        // --- Form cấu hình WiFi (AP Mode) ---
+        const ssid = ssidInput.value.trim();
+        const password = document.getElementById("password").value.trim();
 
-    Send_Data(settingsJSON);
-    alert("✅ Cấu hình Wi-Fi đã được gửi đến thiết bị!");
+        const settingsJSON = JSON.stringify({
+            page: "setting",
+            value: {
+                ssid: ssid,
+                password: password,
+                token: "",
+                server: "",
+                port: ""
+            }
+        });
+
+        Send_Data(settingsJSON);
+        alert("✅ Lưu cấu hình thành công! Thiết bị đang khởi động lại để kết nối WiFi...");
+    } else if (mqttTokenInput) {
+        // --- Form cấu hình MQTT Core IoT (STA Mode) ---
+        const token = mqttTokenInput.value.trim();
+        const server = document.getElementById("mqtt_server").value.trim();
+        const port = document.getElementById("mqtt_port").value.trim();
+
+        const settingsJSON = JSON.stringify({
+            page: "setting",
+            value: {
+                // Để nguyên khoảng trắng hoặc null để C++ không bị lỗi
+                ssid: "STA_MODE_KEEP", 
+                password: "STA_MODE_KEEP",
+                token: token,
+                server: server,
+                port: port
+            }
+        });
+
+        Send_Data(settingsJSON);
+        alert("✅ Lưu cấu hình thành công! Đã gửi thông số Core IoT đến thiết bị...");
+    }
 });
