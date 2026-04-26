@@ -12,7 +12,10 @@
   <!-- Thư viện -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 
 <body class="sta-mode">
@@ -58,6 +61,34 @@
           <h2>🔔 Trạng thái hệ thống</h2>
           <div class="value-display status" id="sys_status">--</div>
         </div>
+      </div>
+
+      <!-- Khu vực nâng cao: Biểu đồ, Bản đồ & Nhật ký -->
+      <div class="dashboard-bottom">
+        
+        <!-- Biểu đồ -->
+        <div class="chart-container">
+          <h3>Biểu đồ Lịch sử</h3>
+          <canvas id="envChart"></canvas>
+        </div>
+
+        <!-- Cột bên phải: Bản đồ + Logs -->
+        <div class="right-panel">
+          <!-- Bản đồ -->
+          <div class="map-container">
+            <h3>Vị trí Trạm Quan Trắc</h3>
+            <div id="map"></div>
+          </div>
+
+          <!-- Nhật ký sự kiện -->
+          <div class="logs-container">
+            <h3>Nhật ký Hệ thống</h3>
+            <ul id="eventLogs" class="event-logs">
+              <li><i>Chưa có dữ liệu...</i></li>
+            </ul>
+          </div>
+        </div>
+
       </div>
     </div>
 

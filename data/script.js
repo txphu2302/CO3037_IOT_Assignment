@@ -10,17 +10,65 @@ let latestTemp = 0;
 let latestHumi = 0;
 let latestSoil = 0;
 
+let lastLedStatus = null;
+let lastSysStatus = null;
+let map;
+
 function onLoad(event) {
     initWebSocket();
     initChart();
+    
+    // Nếu có div#map thì khởi tạo bản đồ (Chỉ STA mode mới có)
+    if (document.getElementById("map")) {
+        initMap();
+        logEvent("Hệ thống khởi động thành công", "info");
+    }
+}
+
+function initMap() {
+    // Tọa độ Bách Khoa
+    const lat = 10.880018410410052;
+    const long = 106.80633605864662;
+    map = L.map('map').setView([lat, long], 16);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    L.marker([lat, long]).addTo(map)
+        .bindPopup('<b>Trạm ESP32 YOLO UNO</b><br>ĐH Bách Khoa TP.HCM')
+        .openPopup();
+}
+
+function logEvent(msg, type = "info") {
+    const logsEl = document.getElementById("eventLogs");
+    if (!logsEl) return;
+    
+    if (logsEl.innerHTML.includes("Chưa có dữ liệu")) {
+        logsEl.innerHTML = "";
+    }
+    
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString();
+    
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="log-time">[${timeStr}]</span> <span class="log-type-${type}">${msg}</span>`;
+    
+    logsEl.prepend(li); // Đẩy lên đầu
+    
+    if (logsEl.children.length > 50) {
+        logsEl.removeChild(logsEl.lastChild);
+    }
 }
 
 function onOpen(event) {
     console.log('Connection opened');
+    logEvent("Đã kết nối với ESP32 (WebSocket)", "info");
 }
 
 function onClose(event) {
     console.log('Connection closed');
+    logEvent("Mất kết nối! Đang thử lại...", "crit");
     setTimeout(initWebSocket, 2000);
 }
 
@@ -41,24 +89,24 @@ function initChart() {
             datasets: [
                 {
                     label: 'Nhiệt độ (°C)',
-                    borderColor: '#ff5722',
-                    backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                    borderColor: '#fb923c',
+                    backgroundColor: 'rgba(251, 146, 60, 0.1)',
                     data: [],
                     tension: 0.4,
                     fill: true
                 },
                 {
-                    label: 'Độ ẩm K2 (%)',
-                    borderColor: '#03a9f4',
-                    backgroundColor: 'rgba(3, 169, 244, 0.1)',
+                    label: 'Độ ẩm (%)',
+                    borderColor: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
                     data: [],
                     tension: 0.4,
                     fill: true
                 },
                 {
                     label: 'Độ ẩm Đất (%)',
-                    borderColor: '#4caf50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    borderColor: '#4ade80',
+                    backgroundColor: 'rgba(74, 222, 128, 0.1)',
                     data: [],
                     tension: 0.4,
                     fill: true
@@ -103,6 +151,10 @@ function onMessage(event) {
                 btn.className = data.led === "ON" ? "toggle-btn on" : "toggle-btn";
                 btn.innerText = data.led;
             }
+            if (lastLedStatus !== data.led) {
+                if (lastLedStatus !== null) logEvent(`Đèn LED chuyển sang ${data.led}`, "info");
+                lastLedStatus = data.led;
+            }
         }
         if (data.humidity !== undefined) {
             latestHumi = data.humidity;
@@ -118,16 +170,15 @@ function onMessage(event) {
             const statusEl = document.getElementById("sys_status");
             if (statusEl) {
                 statusEl.innerText = data.system_status;
-                if (data.system_status === "Normal") {
-                    statusEl.style.color = "#4caf50";
-                    statusEl.style.textShadow = "2px 2px 8px rgba(76, 175, 80, 0.2)";
-                } else if (data.system_status === "Warning") {
-                    statusEl.style.color = "#ff9800";
-                    statusEl.style.textShadow = "2px 2px 8px rgba(255, 152, 0, 0.2)";
-                } else if (data.system_status === "Critical") {
-                    statusEl.style.color = "#f44336";
-                    statusEl.style.textShadow = "2px 2px 8px rgba(244, 67, 54, 0.2)";
+            }
+            if (lastSysStatus !== data.system_status) {
+                if (lastSysStatus !== null) {
+                    let logType = "info";
+                    if (data.system_status === "Warning") logType = "warn";
+                    if (data.system_status === "Critical") logType = "crit";
+                    logEvent(`Cảnh báo: Trạng thái ${data.system_status}`, logType);
                 }
+                lastSysStatus = data.system_status;
             }
         }
 
