@@ -120,10 +120,13 @@
             <i class="fa-solid fa-wifi"></i>
             <input type="text" id="ssid" placeholder="Tên Wi-Fi (SSID)" required>
           </div>
-          <select id="wifi-select" style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; background: #f9f9f9; outline: none; font-family: inherit; display: none;" onchange="if(this.value) document.getElementById('ssid').value = this.value;">
-            <option value="">-- chọn mạng WiFi có sẵn --</option>
-          </select>
-          <p id="scan-status" style="font-size: 0.85rem; color: #818cf8; margin: -5px 0 15px 0; text-align: left; display: none;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tìm WiFi...</p>
+          <select id="wifi-select" style="width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #ccc; background: #f9f9f9; outline: none; font-family: monospace; font-size: 13px; display: none;" onchange="if(this.value) document.getElementById('ssid').value = this.value;"></select>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom: 15px;">
+            <p id="scan-status" style="flex:1; font-size: 0.85rem; color: #818cf8; margin: 0; text-align: left; display: none;"><i class="fa-solid fa-spinner fa-spin"></i> Đang quét WiFi...</p>
+            <button id="btn-rescan" type="button" onclick="rescanWiFi()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #818cf8; background: transparent; color: #818cf8; cursor: pointer; font-size: 0.8rem; white-space: nowrap;">
+              <i class="fa-solid fa-rotate-right"></i> Quét lại
+            </button>
+          </div>
 
           <div class="input-group">
             <i class="fa-solid fa-lock"></i>

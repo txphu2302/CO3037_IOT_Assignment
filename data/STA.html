@@ -6,14 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YOLO UNO - STA MODE</title>
 
-  <!-- CSS -->
   <link rel="stylesheet" href="styles.css">
-
-  <!-- Thư viện -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="chart.js"></script>
-  
-  <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -25,10 +20,18 @@
     <div class="logo-container">
       <div class="yolo-logo"><i class="fa-solid fa-bolt"></i> YOLO<span>UNO</span></div>
     </div>
-
-    <div class="nav-item active" onclick="showSection('home', event)">🏠 <span>Trang chủ</span></div>
-    <div class="nav-item" onclick="showSection('device', event)">⚡ <span>Thiết bị</span></div>
-    <div class="nav-item" onclick="showSection('settings', event)">⚙️ <span>Cài đặt</span></div>
+    <div class="nav-item active" onclick="showSection('home', event)">
+      <i class="fa-solid fa-house"></i> <span>Trang chủ</span>
+    </div>
+    <div class="nav-item" onclick="showSection('device', event)">
+      <i class="fa-solid fa-lightbulb"></i> <span>LED</span>
+    </div>
+    <div class="nav-item" onclick="showSection('pump', event)">
+      <i class="fa-solid fa-droplet"></i> <span>Máy Bơm</span>
+    </div>
+    <div class="nav-item" onclick="showSection('settings', event)">
+      <i class="fa-solid fa-gears"></i> <span>Cài đặt</span>
+    </div>
   </div>
 
   <!-- Nội dung chính -->
@@ -46,41 +49,30 @@
           <h2>🌡️ Nhiệt độ (°C)</h2>
           <div class="value-display" id="temp_value">--</div>
         </div>
-
         <div class="gauge-card">
           <h2>💧 Độ ẩm (%)</h2>
           <div class="value-display humi" id="humi_value">--</div>
         </div>
-
         <div class="gauge-card">
           <h2>🌱 Độ ẩm đất (%)</h2>
           <div class="value-display soil" id="soil_value">--</div>
         </div>
-
         <div class="gauge-card">
           <h2>🔔 Trạng thái hệ thống</h2>
           <div class="value-display status" id="sys_status">--</div>
         </div>
       </div>
 
-      <!-- Khu vực nâng cao: Biểu đồ, Bản đồ & Nhật ký -->
       <div class="dashboard-bottom">
-        
-        <!-- Biểu đồ -->
         <div class="chart-container">
           <h3>Biểu đồ Lịch sử</h3>
           <canvas id="envChart"></canvas>
         </div>
-
-        <!-- Cột bên phải: Bản đồ + Logs -->
         <div class="right-panel">
-          <!-- Bản đồ -->
           <div class="map-container">
             <h3>Vị trí Trạm Quan Trắc</h3>
             <div id="map"></div>
           </div>
-
-          <!-- Nhật ký sự kiện -->
           <div class="logs-container">
             <h3>Nhật ký Hệ thống</h3>
             <ul id="eventLogs" class="event-logs">
@@ -88,75 +80,169 @@
             </ul>
           </div>
         </div>
-
       </div>
     </div>
 
-    <!-- THIẾT BỊ -->
+    <!-- LED -->
     <div id="device" class="section" style="display:none;">
       <header>
-        <h1>Điều khiển Thiết bị</h1>
+        <h1><i class="fa-solid fa-lightbulb"></i> Điều khiển LED</h1>
         <p>Bật/tắt LED và Neo Pixel.</p>
       </header>
-
       <div class="device-list" id="deviceContainer">
-        <!-- Nút điều khiển LED -->
         <div class="device-card">
           <i class="fa-solid fa-lightbulb device-icon"></i>
           <h3>Đèn LED</h3>
           <button id="btnToggleLED" class="toggle-btn" onclick="toggleLED()">OFF</button>
         </div>
-
-        <!-- Nút điều khiển Neo Pixel -->
         <div class="device-card">
           <i class="fa-solid fa-palette device-icon"></i>
           <h3>Neo Pixel</h3>
-          <button id="btnToggleNeo" class="toggle-btn" onclick="toggleNeo()" style="margin-bottom: 15px;">OFF</button>
-          
-          <label style="display:block; margin-bottom: 8px; font-size: 14px; font-weight:600; color:#555;">Bảng màu có sẵn:</label>
+          <button id="btnToggleNeo" class="toggle-btn" onclick="toggleNeo()" style="margin-bottom:15px;">OFF</button>
+          <label style="display:block;margin-bottom:8px;font-size:14px;font-weight:600;color:#555;">Bảng màu có sẵn:</label>
           <div class="color-palette">
-            <div class="color-swatch" style="background-color: #ff0000;" onclick="changeNeoColor('#ff0000')" title="Đỏ"></div>
-            <div class="color-swatch" style="background-color: #00ff00;" onclick="changeNeoColor('#00ff00')" title="Xanh lá"></div>
-            <div class="color-swatch" style="background-color: #0000ff;" onclick="changeNeoColor('#0000ff')" title="Xanh dương"></div>
-            <div class="color-swatch" style="background-color: #ffff00;" onclick="changeNeoColor('#ffff00')" title="Vàng"></div>
-            <div class="color-swatch" style="background-color: #ff00ff;" onclick="changeNeoColor('#ff00ff')" title="Tím"></div>
-            <div class="color-swatch" style="background-color: #00ffff;" onclick="changeNeoColor('#00ffff')" title="Xanh dương nhạt"></div>
+            <div class="color-swatch" style="background-color:#ff0000;" onclick="changeNeoColor('#ff0000')" title="Đỏ"></div>
+            <div class="color-swatch" style="background-color:#00ff00;" onclick="changeNeoColor('#00ff00')" title="Xanh lá"></div>
+            <div class="color-swatch" style="background-color:#0000ff;" onclick="changeNeoColor('#0000ff')" title="Xanh dương"></div>
+            <div class="color-swatch" style="background-color:#ffff00;" onclick="changeNeoColor('#ffff00')" title="Vàng"></div>
+            <div class="color-swatch" style="background-color:#ff00ff;" onclick="changeNeoColor('#ff00ff')" title="Tím"></div>
+            <div class="color-swatch" style="background-color:#00ffff;" onclick="changeNeoColor('#00ffff')" title="Xanh nhạt"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MÁY BƠM -->
+    <div id="pump" class="section" style="display:none;">
+      <header>
+        <h1><i class="fa-solid fa-droplet"></i> Điều khiển Máy Bơm</h1>
+        <p>AUTO / MANUAL / Lịch tưới hàng ngày.</p>
+      </header>
+
+      <div class="device-list" style="grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); margin-bottom: 16px;">
+        <div class="device-card">
+          <h3>Trạng thái bơm</h3>
+          <div class="value-display status" id="pump_state_value">OFF</div>
+          <p style="margin-top:10px;color:#64748b;">Controller: <strong id="pump_controller_value">AUTO</strong></p>
+        </div>
+        <div class="device-card">
+          <h3>Chế độ</h3>
+          <div class="value-display humi" id="pump_mode_value">AUTO</div>
+          <p style="margin-top:10px;color:#64748b;">Độ ẩm đất: <strong id="pump_soil_value">--%</strong></p>
+        </div>
+        <div class="device-card">
+          <h3>Lịch hôm nay</h3>
+          <p style="margin:8px 0;color:#334155;">Giờ chạy: <strong id="pump_schedule_view">06:00</strong></p>
+          <p style="margin:8px 0;color:#334155;">Thời lượng: <strong id="pump_duration_view">15s</strong></p>
+          <p style="margin:8px 0;color:#334155;">Trạng thái: <strong id="pump_schedule_enable_view">TẮT</strong></p>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center; margin-bottom:16px;">
+        <div class="settings-card" style="width: 100%; max-width: 420px;">
+          <h3 style="margin-bottom:12px; text-align:center;">Chọn chế độ</h3>
+          <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button id="btnPumpModeAuto" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpMode('AUTO')">
+              <i class="fa-solid fa-robot"></i> AUTO
+            </button>
+            <button id="btnPumpModeManual" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpMode('MANUAL')">
+              <i class="fa-solid fa-hand"></i> MANUAL
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center; margin-bottom:16px;">
+        <div class="settings-card" style="width:100%; max-width:1100px; padding:18px 20px;">
+          <div style="display:grid; grid-template-columns: 1fr 1px 1fr; align-items:stretch; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:4px 8px;">
+              <h3 style="margin-bottom:12px;">AUTO Config</h3>
+              <div style="width:100%; max-width:320px; display:grid; grid-template-columns: 1fr; gap:10px; margin-bottom:12px;">
+                <div class="input-group">
+                  <i class="fa-solid fa-seedling"></i>
+                  <input type="number" id="pump_threshold_input" min="0" max="100" value="40" placeholder="Ngưỡng ẩm (%)">
+                </div>
+                <div class="input-group">
+                  <i class="fa-solid fa-wave-square"></i>
+                  <input type="number" id="pump_hysteresis_input" min="1" max="30" value="5" placeholder="Hysteresis (%)">
+                </div>
+              </div>
+              <button type="button" class="btn-save" onclick="savePumpAutoConfig()">
+                <i class="fa-solid fa-floppy-disk"></i> Lưu AUTO
+              </button>
+            </div>
+
+            <div style="background:#e2e8f0; width:1px; align-self:stretch;"></div>
+
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:4px 8px;">
+              <h3 style="margin-bottom:12px;">MANUAL Control</h3>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:10px;">
+                <button id="btnPumpOn" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpManualState('ON')">
+                  <i class="fa-solid fa-power-off"></i> ON
+                </button>
+                <button id="btnPumpOff" type="button" class="btn-save" style="padding: 8px 14px; width: 120px; background:#475569;" onclick="setPumpManualState('OFF')">
+                  <i class="fa-solid fa-power-off"></i> OFF
+                </button>
+              </div>
+              <span id="pump_manual_hint" style="display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.9rem; text-align:center;">Trạng thái hiện tại: OFF</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center;">
+        <div class="settings-card" style="width:100%; max-width: 1100px;">
+          <h3 style="margin-bottom:12px;">Lịch tưới hàng ngày</h3>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:10px; margin-bottom:12px;">
+            <div class="input-group">
+              <i class="fa-solid fa-clock"></i>
+              <input type="time" id="pump_schedule_time" value="06:00">
+            </div>
+            <div class="input-group">
+              <i class="fa-solid fa-hourglass-half"></i>
+              <input type="number" id="pump_schedule_duration" min="1" max="3600" value="15" placeholder="Thời lượng (giây)">
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; color:#334155;">
+            <input type="checkbox" id="pump_schedule_enable">
+            <label for="pump_schedule_enable">Bật lịch tưới tự động mỗi ngày</label>
+          </div>
+          <button type="button" class="btn-save" onclick="savePumpSchedule()">
+            <i class="fa-solid fa-calendar-check"></i> Lưu lịch
+          </button>
         </div>
       </div>
     </div>
 
     <!-- CÀI ĐẶT -->
     <div id="settings" class="section settings-section" style="display:none;">
-      <div class="settings-card">
-        <h2><i class="fa-solid fa-gear"></i> Cấu hình thiết bị</h2>
+      <header>
+        <h1><i class="fa-solid fa-gears"></i> Cấu hình thiết bị</h1>
         <p>Nhập thông tin kết nối Core IoT của bạn bên dưới.</p>
-
+      </header>
+      <div class="settings-card">
         <form id="settingsForm">
-          <div class="input-group" style="margin-bottom: 8px;">
+          <div class="input-group" style="margin-bottom:8px;">
             <i class="fa-solid fa-key"></i>
             <input type="text" id="mqtt_token" placeholder="Token Core IoT" required>
           </div>
-
-          <div class="input-group" style="margin-bottom: 8px;">
+          <div class="input-group" style="margin-bottom:8px;">
             <i class="fa-solid fa-server"></i>
             <input type="text" id="mqtt_server" placeholder="Máy chủ (VD: app.coreiot.io)" required>
           </div>
-
           <div class="input-group">
             <i class="fa-solid fa-network-wired"></i>
             <input type="number" id="mqtt_port" placeholder="Cổng (VD: 1883)" required>
           </div>
-
           <button type="submit" class="btn-save">
             <i class="fa-solid fa-floppy-disk"></i> Kết nối
           </button>
         </form>
       </div>
     </div>
+
   </div>
 
-  <!-- JS -->
   <script src="script.js"></script>
 </body>
 

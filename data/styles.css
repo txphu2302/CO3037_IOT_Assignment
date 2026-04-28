@@ -1,22 +1,24 @@
 body {
-  margin          : 0;
-  font-family     : "Poppins", Arial, sans-serif;
-  display         : flex;
-  height          : 100vh;
+  margin: 0;
+  font-family: "Poppins", Arial, sans-serif;
+  display: flex;
+  height: 100vh;
   background-color: #eef2f7;
 }
 
 body.sta-mode {
-  font-family     : "Inter", "Poppins", Arial, sans-serif;
-  background      : radial-gradient(circle at top right, #1e293b, #0f172a);
-  color           : #f8fafc;
+  font-family: "Inter", "Poppins", Arial, sans-serif;
+  background: radial-gradient(circle at top right, #1e293b, #0f172a);
+  color: #f8fafc;
 }
 
 body.sta-mode::before {
   content: "";
   position: absolute;
-  top: -20%; right: -10%;
-  width: 500px; height: 500px;
+  top: -20%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
   background: radial-gradient(circle, rgba(56, 189, 248, 0.15), transparent 70%);
   z-index: -1;
   pointer-events: none;
@@ -24,21 +26,21 @@ body.sta-mode::before {
 
 /* Sidebar */
 .sidebar {
-  width           : 260px;
+  width: 260px;
   background-color: #2294F2;
-  color           : white;
-  display         : flex;
-  flex-direction  : column;
-  align-items     : center;
-  box-shadow      : 3px 0 10px rgba(0, 0, 0, 0.2);
-  z-index         : 10;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 3px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 10;
 }
 
 .sta-mode .sidebar {
-  background      : rgba(15, 23, 42, 0.6);
-  backdrop-filter : blur(20px);
-  border-right    : 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow      : 5px 0 25px rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
 }
 
 .sta-mode .logo-container {
@@ -71,44 +73,45 @@ body.sta-mode::before {
 }
 
 .logo-container {
-  width          : 100%;
-  background     : white;
-  display        : flex;
+  width: 100%;
+  background: white;
+  display: flex;
   justify-content: center;
-  align-items    : center;
-  padding        : 20px 0;
-  border-bottom  : 2px solid rgba(0, 0, 0, 0.1);
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
 }
 
 .logo-img {
-  width : 80%;
+  width: 80%;
   height: auto;
 }
 
 .nav-item {
-  width        : 90%;
-  padding      : 16px 20px;
-  margin       : 8px 0;
-  font-size    : 18px;
-  font-weight  : 600;
-  cursor       : pointer;
+  width: 90%;
+  padding: 16px 20px;
+  margin: 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
   border-radius: 10px;
-  color        : #ecf6ff;
-  transition   : all 0.3s ease;
-  display      : flex;
-  align-items  : center;
-  gap          : 12px;
+  color: #ecf6ff;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .nav-item.active {
   background: #fff;
-  color     : #2294F2;
+  color: #2294F2;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 .sta-mode .nav-item {
   color: #94a3b8;
 }
+
 .sta-mode .nav-item:hover {
   color: #e2e8f0;
   background: rgba(255, 255, 255, 0.05);
@@ -116,7 +119,7 @@ body.sta-mode::before {
 
 .sta-mode .nav-item.active {
   background: linear-gradient(90deg, rgba(56, 189, 248, 0.15), transparent);
-  color     : #38bdf8;
+  color: #38bdf8;
   border-left: 4px solid #38bdf8;
   border-radius: 0 12px 12px 0;
   box-shadow: none;
@@ -128,14 +131,15 @@ body.sta-mode::before {
   font-weight: 700;
   letter-spacing: -0.5px;
 }
+
 .sta-mode header p {
   color: #94a3b8;
 }
 
 /* Main Content */
 .main-content {
-  flex      : 1;
-  padding   : 40px 60px;
+  flex: 1;
+  padding: 40px 60px;
   overflow-y: auto;
 }
 
@@ -149,33 +153,51 @@ body.sta-mode::before {
 }
 
 .gauge-card {
-  background   : white;
+  background: white;
   border-radius: 20px;
-  box-shadow   : 0 8px 20px rgba(0, 0, 0, 0.05);
-  padding      : 25px 15px;
-  text-align   : center;
-  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  position     : relative;
-  overflow     : hidden;
-  border       : 1px solid rgba(0,0,0,0.02);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  padding: 25px 15px;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.02);
 }
 
 .gauge-card::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 5px;
   background: linear-gradient(90deg, #ece9e6, #ffffff);
 }
 
 /* Thêm màu viền trên cho từng thẻ */
-.gauge-card:nth-child(1)::before { background: linear-gradient(90deg, #ff9966, #ff5e62); } /* Nhiệt độ */
-.gauge-card:nth-child(2)::before { background: linear-gradient(90deg, #36D1DC, #5B86E5); } /* Độ ẩm */
-.gauge-card:nth-child(3)::before { background: linear-gradient(90deg, #11998e, #38ef7d); } /* Đất */
-.gauge-card:nth-child(4)::before { background: linear-gradient(90deg, #8E54E9, #4776E6); } /* Trạng thái */
+.gauge-card:nth-child(1)::before {
+  background: linear-gradient(90deg, #ff9966, #ff5e62);
+}
+
+/* Nhiệt độ */
+.gauge-card:nth-child(2)::before {
+  background: linear-gradient(90deg, #36D1DC, #5B86E5);
+}
+
+/* Độ ẩm */
+.gauge-card:nth-child(3)::before {
+  background: linear-gradient(90deg, #11998e, #38ef7d);
+}
+
+/* Đất */
+.gauge-card:nth-child(4)::before {
+  background: linear-gradient(90deg, #8E54E9, #4776E6);
+}
+
+/* Trạng thái */
 
 .gauge-card:hover {
-  transform : translateY(-8px);
+  transform: translateY(-8px);
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
 }
 
@@ -188,7 +210,11 @@ body.sta-mode::before {
   letter-spacing: 0.5px;
 }
 
-.sta-mode .gauge-card h2 { color: #cbd5e1; font-weight: 500; font-size: 15px; }
+.sta-mode .gauge-card h2 {
+  color: #cbd5e1;
+  font-weight: 500;
+  font-size: 15px;
+}
 
 .value-display {
   font-size: 42px;
@@ -221,38 +247,50 @@ body.sta-mode::before {
 }
 
 /* Chỉnh màu Neon cho Text ở STA mode */
-.sta-mode .value-display { color: #fb923c; text-shadow: 0 0 15px rgba(251, 146, 60, 0.4); }
-.sta-mode .value-display.humi { color: #38bdf8; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-.sta-mode .value-display.soil { color: #4ade80; text-shadow: 0 0 15px rgba(74, 222, 128, 0.4); }
-.sta-mode .value-display.status { 
-  background: rgba(147, 51, 234, 0.1); 
-  color: #c084fc; 
+.sta-mode .value-display {
+  color: #fb923c;
+  text-shadow: 0 0 15px rgba(251, 146, 60, 0.4);
+}
+
+.sta-mode .value-display.humi {
+  color: #38bdf8;
+  text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+
+.sta-mode .value-display.soil {
+  color: #4ade80;
+  text-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+}
+
+.sta-mode .value-display.status {
+  background: rgba(147, 51, 234, 0.1);
+  color: #c084fc;
   text-shadow: 0 0 10px rgba(192, 132, 252, 0.4);
   border: 1px solid rgba(192, 132, 252, 0.2);
 }
 
 /* Device Page */
 .device-list {
-  display        : flex;
-  flex-wrap      : wrap;
-  gap            : 25px;
-  margin-top     : 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
+  margin-top: 30px;
   justify-content: center;
 }
 
 /* Real-time Chart */
 .chart-container {
-  background   : white;
+  background: white;
   border-radius: 20px;
-  box-shadow   : 0 6px 20px rgba(0, 0, 0, 0.08);
-  padding      : 20px 30px;
-  margin-top   : 25px;
-  width        : 100%;
-  max-width    : 1000px;
-  height       : 380px;
-  margin-left  : auto;
-  margin-right : auto;
-  position     : relative;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 20px 30px;
+  margin-top: 25px;
+  width: 100%;
+  max-width: 1000px;
+  height: 380px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
 }
 
 /* === Bố cục Nâng cao STA Mode === */
@@ -317,7 +355,8 @@ body.sta-mode::before {
   width: 100%;
   height: 100%;
   border-radius: 12px;
-  z-index: 1; /* Để không che Sidebar */
+  z-index: 1;
+  /* Để không che Sidebar */
 }
 
 /* Dark mode for Leaflet Map */
@@ -352,24 +391,33 @@ body.sta-mode::before {
   margin-right: 8px;
   font-family: monospace;
 }
-.sta-mode .log-type-info { color: #38bdf8; }
-.sta-mode .log-type-warn { color: #fb923c; }
-.sta-mode .log-type-crit { color: #ef4444; }
+
+.sta-mode .log-type-info {
+  color: #38bdf8;
+}
+
+.sta-mode .log-type-warn {
+  color: #fb923c;
+}
+
+.sta-mode .log-type-crit {
+  color: #ef4444;
+}
 
 .device-card {
-  background   : #fff;
+  background: #fff;
   border-radius: 20px;
-  box-shadow   : 0 8px 20px rgba(0, 0, 0, 0.05);
-  width        : 260px;
-  padding      : 30px 25px;
-  text-align   : center;
-  position     : relative;
-  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  border       : 1px solid rgba(0,0,0,0.03);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  width: 260px;
+  padding: 30px 25px;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .device-card:hover {
-  transform : translateY(-8px);
+  transform: translateY(-8px);
   box-shadow: 0 15px 35px rgba(34, 148, 242, 0.15);
 }
 
@@ -398,8 +446,8 @@ body.sta-mode::before {
 .sta-mode .toggle-btn {
   background: rgba(15, 23, 42, 0.6);
   color: #94a3b8;
-  border: 1px solid rgba(255,255,255,0.05);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 .sta-mode .toggle-btn.on {
@@ -407,16 +455,17 @@ body.sta-mode::before {
   color: #fff;
   border-color: transparent;
   box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
-  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 .sta-mode label {
   color: #cbd5e1 !important;
 }
-  font-size    : 42px;
-  color        : #2a5298;
-  margin-bottom: 15px;
-  filter: drop-shadow(0 4px 6px rgba(42, 82, 152, 0.3));
+
+font-size : 42px;
+color : #2a5298;
+margin-bottom: 15px;
+filter: drop-shadow(0 4px 6px rgba(42, 82, 152, 0.3));
 }
 
 .device-card h3 {
@@ -427,32 +476,32 @@ body.sta-mode::before {
 }
 
 .toggle-btn {
-  width        : 100%;
-  border       : none;
+  width: 100%;
+  border: none;
   border-radius: 12px;
-  padding      : 14px;
-  font-weight  : 600;
-  font-size    : 16px;
-  cursor       : pointer;
-  background   : #f1f3f5;
-  color        : #555;
-  transition   : all 0.3s;
-  box-shadow   : inset 0 2px 4px rgba(0,0,0,0.05);
+  padding: 14px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  background: #f1f3f5;
+  color: #555;
+  transition: all 0.3s;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .toggle-btn.on {
   background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
-  color     : white;
+  color: white;
   box-shadow: 0 8px 15px rgba(0, 114, 255, 0.3);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .delete-icon {
   position: absolute;
-  top     : 10px;
-  right   : 12px;
-  color   : #e74c3c;
-  cursor  : pointer;
+  top: 10px;
+  right: 12px;
+  color: #e74c3c;
+  cursor: pointer;
 }
 
 .color-palette {
@@ -467,8 +516,8 @@ body.sta-mode::before {
   height: 28px;
   border-radius: 50%;
   cursor: pointer;
-  border: 2px solid rgba(0,0,0,0.1);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s, border-color 0.2s;
 }
 
@@ -478,47 +527,47 @@ body.sta-mode::before {
 }
 
 .add-relay-btn {
-  position     : fixed;
-  bottom       : 35px;
-  right        : 35px;
-  background   : linear-gradient(135deg, #2294F2, #1a75e6);
-  color        : white;
-  border       : none;
+  position: fixed;
+  bottom: 35px;
+  right: 35px;
+  background: linear-gradient(135deg, #2294F2, #1a75e6);
+  color: white;
+  border: none;
   border-radius: 50%;
-  width        : 80px;
+  width: 80px;
   /* to hơn chút */
-  height       : 80px;
-  font-size    : 34px;
+  height: 80px;
+  font-size: 34px;
   /* icon lớn hơn */
-  cursor       : pointer;
-  box-shadow   : 0 6px 20px rgba(0, 0, 0, 0.25);
-  transition   : 0.3s;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transition: 0.3s;
 }
 
 .add-relay-btn:hover {
-  transform : scale(1.08);
+  transform: scale(1.08);
   box-shadow: 0 8px 25px rgba(34, 148, 242, 0.4);
 }
 
 
 /* Settings */
 .settings-section {
-  display        : flex;
+  display: flex;
   justify-content: center;
-  align-items    : flex-start;
-  padding-top    : 40px;
-  height         : 100%;
+  align-items: flex-start;
+  padding-top: 40px;
+  height: 100%;
 }
 
 .settings-card {
-  background   : white;
-  padding      : 50px 60px;
+  background: white;
+  padding: 50px 60px;
   border-radius: 24px;
-  box-shadow   : 0 15px 40px rgba(0, 0, 0, 0.08);
-  width        : 850px;
-  max-width    : 95%;
-  text-align   : center;
-  border       : 1px solid rgba(0,0,0,0.03);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+  width: 850px;
+  max-width: 95%;
+  text-align: center;
+  border: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .sta-mode .settings-card {
@@ -544,7 +593,7 @@ body.sta-mode::before {
 
 .sta-mode .input-group input {
   background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #f8fafc;
 }
 
@@ -553,131 +602,132 @@ body.sta-mode::before {
   box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
   background: rgba(15, 23, 42, 0.8);
 }
-  color        : #2a5298;
-  font-weight  : 700;
-  font-size    : 28px;
-  margin-bottom: 15px;
+
+color : #2a5298;
+font-weight : 700;
+font-size : 28px;
+margin-bottom: 15px;
 }
 
 .settings-card p {
-  color        : #777;
+  color: #777;
   margin-bottom: 35px;
-  font-size    : 16px;
+  font-size: 16px;
 }
 
 /* FORM STYLE — vertical layout with spacing */
 #settingsForm {
-  width         : 100%;
-  display       : flex;
+  width: 100%;
+  display: flex;
   flex-direction: column;
-  align-items   : center;
+  align-items: center;
 }
 
 /* mỗi input-group là 1 dòng, cách nhau */
 .input-group {
-  position     : relative;
-  width        : 98%;
+  position: relative;
+  width: 98%;
   /* ✅ rộng gần hết khung */
-  max-width    : 760px;
+  max-width: 760px;
   /* ✅ dài hơn hẳn */
   margin-bottom: 20px;
   /* ✅ tạo khoảng cách giữa các dòng */
 }
 
 .input-group i {
-  position : absolute;
-  top      : 50%;
-  left     : 18px;
+  position: absolute;
+  top: 50%;
+  left: 18px;
   transform: translateY(-50%);
-  color    : #2294F2;
+  color: #2294F2;
   font-size: 18px;
 }
 
 .input-group input {
-  width           : 100%;
-  padding         : 16px 18px 16px 54px;
-  border-radius   : 14px;
-  border          : 1.5px solid #ccc;
-  font-size       : 17px;
+  width: 100%;
+  padding: 16px 18px 16px 54px;
+  border-radius: 14px;
+  border: 1.5px solid #ccc;
+  font-size: 17px;
   background-color: #f9f9f9;
-  transition      : all 0.3s ease;
-  box-sizing      : border-box;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .input-group input:focus {
-  border-color    : #2294F2;
-  box-shadow      : 0 0 10px rgba(34, 148, 242, 0.25);
+  border-color: #2294F2;
+  box-shadow: 0 0 10px rgba(34, 148, 242, 0.25);
   background-color: #fff;
 }
 
 /* Save Button */
 .btn-save {
-  margin-top   : 25px;
-  background   : linear-gradient(90deg, #2294F2, #1b7fe0);
-  color        : white;
-  border       : none;
+  margin-top: 25px;
+  background: linear-gradient(90deg, #2294F2, #1b7fe0);
+  color: white;
+  border: none;
   border-radius: 12px;
-  padding      : 16px 44px;
-  font-size    : 18px;
-  font-weight  : 600;
-  cursor       : pointer;
-  box-shadow   : 0 6px 18px rgba(34, 148, 242, 0.45);
-  transition   : all 0.3s ease;
+  padding: 16px 44px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(34, 148, 242, 0.45);
+  transition: all 0.3s ease;
 }
 
 .btn-save:hover {
-  transform : translateY(-2px);
+  transform: translateY(-2px);
   box-shadow: 0 8px 22px rgba(34, 148, 242, 0.55);
 }
 
 .sta-mode .btn-save {
-  margin-top   : 35px;
-  background   : linear-gradient(135deg, #10b981 0%, #059669 100%);
+  margin-top: 35px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border-radius: 16px;
-  padding      : 18px 50px;
-  font-weight  : 700;
-  color        : #fff;
-  border       : 1px solid rgba(16, 185, 129, 0.4);
-  box-shadow   : 0 0 20px rgba(16, 185, 129, 0.4);
-  transition   : all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  padding: 18px 50px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
 
 .sta-mode .btn-save:hover {
-  transform : translateY(-4px) scale(1.02);
+  transform: translateY(-4px) scale(1.02);
   box-shadow: 0 0 30px rgba(16, 185, 129, 0.6);
-  background   : linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
 }
 
 
 /* Dialog */
 .dialog-overlay {
-  position       : fixed;
-  top            : 0;
-  left           : 0;
-  right          : 0;
-  bottom         : 0;
-  background     : rgba(0, 0, 0, 0.5);
-  display        : flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
   justify-content: center;
-  align-items    : center;
-  z-index        : 100;
+  align-items: center;
+  z-index: 100;
 }
 
 .dialog {
-  background   : white;
+  background: white;
   border-radius: 20px;
-  padding      : 35px 30px;
-  width        : 380px;
-  text-align   : center;
-  box-shadow   : 0 12px 35px rgba(0, 0, 0, 0.25);
-  animation    : popIn 0.25s ease;
+  padding: 35px 30px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+  animation: popIn 0.25s ease;
 }
 
 .dialog h3 {
   font-size: 22px;
-  color    : #2294F2;
+  color: #2294F2;
 }
 
 .dialog.warning h3 {
@@ -685,56 +735,56 @@ body.sta-mode::before {
 }
 
 .dialog p {
-  color    : #666;
+  color: #666;
   font-size: 15px;
 }
 
 .input-field input {
-  width        : 90%;
-  padding      : 12px;
-  border       : 1.5px solid #ccc;
+  width: 90%;
+  padding: 12px;
+  border: 1.5px solid #ccc;
   border-radius: 10px;
   margin-bottom: 15px;
 }
 
 .dialog-buttons {
-  display        : flex;
+  display: flex;
   justify-content: center;
-  gap            : 15px;
+  gap: 15px;
 }
 
 .dialog-buttons button {
-  padding      : 10px 22px;
-  border       : none;
+  padding: 10px 22px;
+  border: none;
   border-radius: 10px;
-  font-weight  : 600;
-  cursor       : pointer;
-  transition   : 0.3s;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
 }
 
 .dialog-buttons .confirm {
   background: linear-gradient(90deg, #2294F2, #1b7fe0);
-  color     : white;
+  color: white;
 }
 
 .dialog-buttons .danger {
   background: #e74c3c;
-  color     : white;
+  color: white;
 }
 
 .dialog-buttons .cancel {
   background: #ddd;
-  color     : #333;
+  color: #333;
 }
 
 @keyframes popIn {
   from {
     transform: scale(0.8);
-    opacity  : 0;
+    opacity: 0;
   }
 
   to {
     transform: scale(1);
-    opacity  : 1;
+    opacity: 1;
   }
 }

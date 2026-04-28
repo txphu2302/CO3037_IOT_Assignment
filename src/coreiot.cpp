@@ -5,6 +5,8 @@
 const char* coreIOT_Server = "10.235.76.226";  
 const char* coreIOT_Token = "g7drm1amhd3dchr379xu";   // Device Access Token
 const int   mqttPort = 1883;
+const float deviceLatitude = 10.880018f;   // from data/script.js
+const float deviceLongitude = 106.806336f; // from data/script.js
 // ----------------------------------------
 
 WiFiClient espClient;
@@ -157,7 +159,9 @@ void coreiot_task(void *pvParameters){
             String payload = "{\"temperature\":" + String(glob_temperature) +  
                              ",\"humidity\":" + String(glob_humidity) + 
                              ",\"soil_moisture\":" + String(glob_soil_moisture) + 
-                             ",\"system_status\":\"" + statusStr + "\"}";
+                             ",\"system_status\":\"" + statusStr + "\"" +
+                             ",\"lat\":" + String(deviceLatitude, 6) +
+                             ",\"long\":" + String(deviceLongitude, 6) + "}";
             
             client.publish("v1/devices/me/telemetry", payload.c_str());
             
