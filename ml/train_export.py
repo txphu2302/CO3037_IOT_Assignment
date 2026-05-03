@@ -12,6 +12,8 @@ import sys
 
 import numpy as np
 
+import contextlib
+
 # --- Sync with include/risk_label.h ---
 
 
@@ -37,20 +39,20 @@ def final_label(t: float, h: float) -> int:
     return a if a > b else b
 
 
-def build_dataset(rng: np.random.Generator, n_extra: int = 4000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def build_dataset(rng: np.random.Generator, n_extra: int = 3000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rows: list[tuple[float, float, int]] = []
     # Grid near decision boundaries (temperature / humidity thresholds)
-    for t in np.linspace(15.0, 38.0, 28):
-        for h in np.linspace(22.0, 95.0, 32):
-            for _ in range(2):
-                tt = float(t + rng.normal(0, 0.35))
-                hh = float(h + rng.normal(0, 0.9))
+    for t in np.linspace(10.0, 45.0, 30):
+        for h in np.linspace(20.0, 75.0, 30):
+            for _ in range(3):
+                tt = float(t + rng.normal(0, 0.25))
+                hh = float(h + rng.normal(0, 0.75))
                 y = final_label(tt, hh)
                 rows.append((tt, hh, y))
     # Extra random coverage
     for _ in range(n_extra):
-        tt = float(rng.uniform(15.0, 40.0))
-        hh = float(rng.uniform(20.0, 98.0))
+        tt = float(rng.uniform(10.0, 45.0))
+        hh = float(rng.uniform(20.0, 75.0))
         rows.append((tt, hh, final_label(tt, hh)))
 
     xs = np.array([[r[0], r[1]] for r in rows], dtype=np.float32)
@@ -131,22 +133,37 @@ def main() -> int:
         restore_best_weights=True,
         verbose=1,
     )
+    
+    loss_before, acc_before = model.evaluate(xs[va], ys0[va], verbose=0)
+    print(f"Accuracy before training: val_accuracy={acc_before:.4f}, val_loss={loss_before:.4f}")
+
     model.fit(
         xs[tr],
         ys0[tr],
         validation_data=(xs[va], ys0[va]),
-        epochs=80,
+        epochs=50,
         batch_size=64,
         verbose=1,
         callbacks=[early],
     )
 
-    loss, acc = model.evaluate(xs[va], ys0[va], verbose=0)
-    print(f"Validation accuracy: {acc:.4f} loss={loss:.4f}")
+    loss_after, acc_after = model.evaluate(xs[va], ys0[va], verbose=0)
+    print(f"Accuracy after training: val_accuracy={acc_after:.4f}, val_loss={loss_after:.4f}")
+
+    import logging
+    logging.getLogger("absl").setLevel(logging.ERROR)
+
+    # converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    # converter.optimizations = []
+    # tflite_model = converter.convert()
+    # with open(tflite_path, "wb") as f:
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = []
-    tflite_model = converter.convert()
+    
+    with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+        tflite_model = converter.convert()
+        
     with open(tflite_path, "wb") as f:
         f.write(tflite_model)
     print(f"Wrote {tflite_path} ({len(tflite_model)} bytes)")
