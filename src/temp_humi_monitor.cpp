@@ -1,5 +1,8 @@
 #include "temp_humi_monitor.h"
+
 #include "task_webserver.h"
+#include "risk_label.h"
+#include "serial_log.h"
 DHT20 dht20;
 LiquidCrystal_I2C lcd(0x27,16,2);
 
@@ -38,7 +41,9 @@ void temp_humi_monitor(void *pvParameters){
 
         // Check if any reads failed and exit early
         if (isnan(temperature) || isnan(humidity)) {
+            serialLogLock();
             Serial.println("Failed to read from DHT sensor!");
+            serialLogUnlock();
             temperature = humidity =  -1;
             //return;
         }
@@ -53,28 +58,22 @@ void temp_humi_monitor(void *pvParameters){
             ctx->temperature = temperature;
             ctx->humidity = humidity;
             
-            // Task 1 Logic
-            int newLedState = 1; // Normal
-            if (temperature >= 30.0) newLedState = 3; // Critical
-            else if (temperature >= 25.0) newLedState = 2; // Warning
-            
+            // Task 1 Logic (temperature bands)
+            const int newLedState = risk_led_state_from_temperature(temperature);
             if (newLedState != ctx->ledState) {
                 ctx->ledState = newLedState;
                 xSemaphoreGive(ctx->semLEDUpdate);
             }
 
-            // Task 2 Logic
-            int newNeoState = 1; // Normal
-            if (humidity >= 70.0) newNeoState = 3; // Critical
-            else if (humidity >= 50.0) newNeoState = 2; // Warning
-            
+            // Task 2 Logic (humidity bands)
+            const int newNeoState = risk_neo_state_from_humidity(humidity);
             if (newNeoState != ctx->neoState) {
                 ctx->neoState = newNeoState;
                 xSemaphoreGive(ctx->semNeoUpdate);
             }
 
             // LCD status logic: worst case between temperature and humidity
-            int newLcdState = (newLedState > newNeoState) ? newLedState : newNeoState;
+            const int newLcdState = risk_final_label(temperature, humidity);
             if (newLcdState != ctx->lcdState) {
                 ctx->lcdState = newLcdState;
                 xSemaphoreGive(ctx->semLCDUpdate);
@@ -83,12 +82,14 @@ void temp_humi_monitor(void *pvParameters){
             xSemaphoreGive(ctx->mutexContext);
         }
 
-        // Print the results
+        // Print the results (whole line under mutex — avoids interleave with TinyML Serial)
+        serialLogLock();
         Serial.print("Humidity: ");
         Serial.print(humidity);
         Serial.print("%  Temperature: ");
         Serial.print(temperature);
         Serial.println("°C");
+        serialLogUnlock();
 
         String statusStr = "Unknown";
         if (pvParameters != NULL) {

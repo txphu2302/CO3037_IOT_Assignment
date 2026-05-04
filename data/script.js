@@ -1,6 +1,12 @@
 // ==================== WEBSOCKET ====================
-var gateway = `ws://${window.location.hostname}/ws`;
 var websocket;
+var wsRetryTimer = null;
+
+function buildGateway() {
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    // host includes hostname + port (if any), safer than hostname only
+    return `${wsProto}://${window.location.host}/ws`;
+}
 
 window.addEventListener('load', onLoad);
 
@@ -73,14 +79,27 @@ function onOpen(event) {
 function onClose(event) {
     console.log('Connection closed');
     logEvent("Mất kết nối! Đang thử lại...", "crit");
-    setTimeout(initWebSocket, 2000);
+    if (wsRetryTimer) clearTimeout(wsRetryTimer);
+    wsRetryTimer = setTimeout(initWebSocket, 2000);
+}
+
+function onError(event) {
+    console.warn("WebSocket error:", event);
+    logEvent("Lỗi WebSocket, đang thử kết nối lại...", "warn");
+    try {
+        websocket.close();
+    } catch (_) { }
 }
 
 function initWebSocket() {
-    console.log('Trying to open a WebSocket connection…');
+    const gateway = buildGateway();
+    console.log('Trying to open a WebSocket connection:', gateway);
+    if (websocket && websocket.readyState === WebSocket.OPEN) return;
+    if (websocket && websocket.readyState === WebSocket.CONNECTING) return;
     websocket = new WebSocket(gateway);
     websocket.onopen = onOpen;
     websocket.onclose = onClose;
+    websocket.onerror = onError;
     websocket.onmessage = onMessage;
 }
 

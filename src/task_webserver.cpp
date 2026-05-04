@@ -40,11 +40,23 @@ void connnectWSV() {
   ws.onEvent(onEvent);
   server.addHandler(&ws);
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (WiFi.status() == WL_CONNECTED) {
-      request->send(LittleFS, "/STA.html", "text/html");
-    } else {
+    const IPAddress localIp = request->client()->localIP();
+
+    // Serve page by interface that received the request:
+    // - AP client hitting 192.168.4.1 => AP page
+    // - STA/LAN client hitting station IP => STA page
+    if (localIp == WiFi.softAPIP()) {
       request->send(LittleFS, "/AP.html", "text/html");
+      return;
     }
+
+    if ((WiFi.status() == WL_CONNECTED) && (localIp == WiFi.localIP())) {
+      request->send(LittleFS, "/STA.html", "text/html");
+      return;
+    }
+
+    // Fallback: keep AP setup reachable even in ambiguous states.
+    request->send(LittleFS, "/AP.html", "text/html");
   });
   server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(LittleFS, "/script.js", "application/javascript");
