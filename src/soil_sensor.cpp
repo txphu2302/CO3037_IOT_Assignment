@@ -3,8 +3,6 @@
 #include "task_webserver.h"
 #define SOIL_PIN 1
 
-float glob_soil_moisture = 0;
-
 void task_soil_sensor(void *pvParameters) {
     Wire.begin(11, 12);
     uint8_t warmupSamples = 0;
@@ -13,11 +11,15 @@ void task_soil_sensor(void *pvParameters) {
         int soil_moisture = analogRead(SOIL_PIN);
         float new_soil = map(soil_moisture, 0, 4095, 0, 100);
         
-        glob_soil_moisture = new_soil;
         if (warmupSamples < 3) {
             warmupSamples++;
             if (warmupSamples >= 3) {
-                glob_soil_ready = true;
+                if (pvParameters != NULL) {
+                    SharedContext* ctx = (SharedContext*)pvParameters;
+                    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                    ctx->soilReady = true;
+                    xSemaphoreGive(ctx->mutexContext);
+                }
             }
         }
 
@@ -31,7 +33,9 @@ void task_soil_sensor(void *pvParameters) {
 
         // Gửi qua WebSocket
         String jsonStr = "{\"soil_moisture\":" + String(new_soil, 2) + "}";
-        Webserver_sendata(jsonStr);
+        if (pvParameters != NULL) {
+            Webserver_sendata((SharedContext*)pvParameters, jsonStr);
+        }
 
         Serial.print("Soil Moisture: ");
         Serial.println(new_soil);

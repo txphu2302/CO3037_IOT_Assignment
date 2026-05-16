@@ -8,7 +8,7 @@
 #include <ArduinoJson.h>
 
 
-void coreiot_publish_attribute(String key, bool value);
+void coreiot_publish_attribute(SharedContext *ctx, const String &key, bool value);
 void coreiot_task(void *pvParameters);
 
 #endif

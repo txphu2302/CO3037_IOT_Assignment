@@ -1,173 +1,314 @@
 #include "coreiot.h"
+#include "risk_label.h"
 #include "task_webserver.h"
 
-// ----------- CONFIGURE THESE! -----------
-const char* coreIOT_Server = "10.235.76.226";  
-const char* coreIOT_Token = "g7drm1amhd3dchr379xu";   // Device Access Token
-const int   mqttPort = 1883;
-const float deviceLatitude = 10.880018f;   // from data/script.js
-const float deviceLongitude = 106.806336f; // from data/script.js
-// ----------------------------------------
-
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-void coreiot_publish_attribute(String key, bool value) {
-    if (client.connected()) {
-        String payload = "{\"" + key + "\":" + (value ? "true" : "false") + "}";
-        client.publish("v1/devices/me/attributes", payload.c_str());
-        Serial.println("📤 Đã đồng bộ lên CoreIOT: " + payload);
-    }
+static String statusTextFromState(int state)
+{
+  if (state == 3)
+    return "Critical";
+  if (state == 2)
+    return "Warning";
+  return "Normal";
 }
 
-
-void reconnect() {
-  // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    // Attempt to connect (username=token, password=empty)
-    //if (client.connect("ESP32Client", coreIOT_Token, NULL)) {
-    String clientId = "ESP32Client-";
-    clientId += String(random(0xffff), HEX);
-
-    if (client.connect(clientId.c_str(), CORE_IOT_TOKEN.c_str(), NULL)) {
-        
-      Serial.println("connected to CoreIOT Server!");
-      client.subscribe("v1/devices/me/rpc/request/+");
-      Serial.println("Subscribed to v1/devices/me/rpc/request/+");
-
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
-    }
-  }
-}
-
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.println("] ");
-
-  // Allocate a temporary buffer for the message
-  char message[length + 1];
-  memcpy(message, payload, length);
-  message[length] = '\0';
-  Serial.print("Payload: ");
-  Serial.println(message);
-
-  // Parse JSON
-  StaticJsonDocument<256> doc;
-  DeserializationError error = deserializeJson(doc, message);
-
-  if (error) {
-    Serial.print("deserializeJson() failed: ");
-    Serial.println(error.c_str());
+void coreiot_publish_attribute(SharedContext *ctx, const String &key, bool value)
+{
+  if (!ctx || !ctx->coreiotMqtt)
+  {
     return;
   }
 
-  const char* method = doc["method"];
-  
-  if (strcmp(method, "getValueLED") == 0) {
-      // CoreIOT hỏi trạng thái hiện tại của LED
-      String topicStr = String(topic);
-      String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
-      String responseTopic = "v1/devices/me/rpc/response/" + requestId;
-      
-      String responsePayload = led_ap_manual_state ? "true" : "false";
-      client.publish(responseTopic.c_str(), responsePayload.c_str());
-  } 
-  else if (strcmp(method, "setValueLED") == 0) {
-      // CoreIOT ra lệnh bật/tắt LED
-      bool params = doc["params"];
-      
-      // Cập nhật trạng thái cho hệ thống
-      led_ap_manual_override = true;
-      led_ap_manual_state = params;
+  if (ctx->mutexMqtt)
+  {
+    xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+  }
 
-      // Phản hồi xác nhận lại cho CoreIOT
-      String topicStr = String(topic);
-      String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
-      String responseTopic = "v1/devices/me/rpc/response/" + requestId;
-      client.publish(responseTopic.c_str(), params ? "true" : "false");
+  if (ctx->coreiotMqtt->connected())
+  {
+    String payload = "{\"" + key + "\":" + (value ? "true" : "false") + "}";
+    ctx->coreiotMqtt->publish("v1/devices/me/attributes", payload.c_str());
+  }
 
-      Serial.println(params ? "Device turned ON from CoreIOT." : "Device turned OFF from CoreIOT.");
-      
-      // Đồng bộ xuống tất cả các màn hình WebServer
-      String wsMsg = "{\"led\":\"" + String(params ? "ON" : "OFF") + "\"}";
-      Webserver_sendata(wsMsg);
-  } else {
-    Serial.print("Unknown method: ");
-    Serial.println(method);
+  if (ctx->mutexMqtt)
+  {
+    xSemaphoreGive(ctx->mutexMqtt);
   }
 }
 
+static bool mqttReconnect(SharedContext *ctx)
+{
+  if (!ctx || !ctx->coreiotMqtt)
+  {
+    return false;
+  }
 
-void setup_coreiot(){
+  String token;
+  xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+  token = ctx->coreIotToken;
+  xSemaphoreGive(ctx->mutexContext);
 
-  //Serial.print("Connecting to WiFi...");
-  //WiFi.begin(wifi_ssid, wifi_password);
-  //while (WiFi.status() != WL_CONNECTED) {
-  
-  // while (isWifiConnected == false) {
-  //   delay(500);
-  //   Serial.print(".");
-  // }
+  if (token.isEmpty())
+  {
+    return false;
+  }
 
-  while(1){
-    if (xSemaphoreTake(xBinarySemaphoreInternet, portMAX_DELAY)) {
-      break;
+  String clientId = "ESP32Client-";
+  clientId += String(random(0xffff), HEX);
+
+  return ctx->coreiotMqtt->connect(clientId.c_str(), token.c_str(), nullptr);
+}
+
+void coreiot_task(void *pvParameters)
+{
+  SharedContext *ctx = static_cast<SharedContext *>(pvParameters);
+  if (!ctx || !ctx->coreiotMqtt)
+  {
+    vTaskDelete(nullptr);
+    return;
+  }
+
+  // Wait for STA WiFi
+  if (ctx->semInternetConnected)
+  {
+    xSemaphoreTake(ctx->semInternetConnected, portMAX_DELAY);
+  }
+
+  String server;
+  uint16_t port = 1883;
+  xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+  server = ctx->coreIotServer;
+  port = (uint16_t)ctx->coreIotPort.toInt();
+  xSemaphoreGive(ctx->mutexContext);
+  if (port == 0)
+  {
+    port = 1883;
+  }
+
+  ctx->coreiotMqtt->setServer(server.c_str(), port);
+
+  // Callback uses std::function on ESP32, so we can capture ctx safely.
+  ctx->coreiotMqtt->setCallback([ctx](char *topic, uint8_t *payload, unsigned int length)
+                                {
+    String topicStr(topic);
+    String message;
+    message.reserve(length + 1);
+    for (unsigned int i = 0; i < length; ++i) {
+      message += (char)payload[i];
     }
-    delay(500);
-    Serial.print(".");
-  }
 
+    StaticJsonDocument<256> doc;
+    if (deserializeJson(doc, message) != DeserializationError::Ok) {
+      return;
+    }
 
-  Serial.println(" Connected!");
+    const char* method = doc["method"] | "";
+    Serial.printf("CoreIoT RPC received: method=%s\n", method);
+    if (strcmp(method, "getValueLED") == 0) {
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
 
-  client.setServer(CORE_IOT_SERVER.c_str(), CORE_IOT_PORT.toInt());
-  client.setCallback(callback);
+      bool ledOn = false;
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      ledOn = ctx->ledManualState;
+      xSemaphoreGive(ctx->mutexContext);
 
-}
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), ledOn ? "true" : "false");
+      return;
+    }
 
-void coreiot_task(void *pvParameters){
+    if (strcmp(method, "setValueLED") == 0) {
+      bool params = false;
+      if (doc["params"].is<bool>()) {
+        params = doc["params"].as<bool>();
+      } else {
+        params = (doc["params"].as<String>() == "true" || doc["params"].as<String>() == "1" || doc["params"].as<String>() == "ON");
+      }
 
-    setup_coreiot();
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
 
-    unsigned long lastPublish = 0;
-    while(1){
+      Serial.printf("setValueLED: params=%s\n", params ? "true" : "false");
 
-        if (!client.connected()) {
-            reconnect();
-        }
-        client.loop();
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      ctx->ledManualOverride = true;
+      ctx->ledManualState = params;
+      xSemaphoreGive(ctx->mutexContext);
 
-        if (millis() - lastPublish >= 10000) {
-            lastPublish = millis();
-            
-            // Tính toán System Status giống như Local WebServer
-            String statusStr = "Normal";
-            if (glob_temperature >= 30.0 || glob_humidity >= 70.0) {
-                statusStr = "Critical";
-            } else if (glob_temperature >= 25.0 || glob_humidity >= 50.0) {
-                statusStr = "Warning";
-            }
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), params ? "true" : "false");
 
-            // Mở rộng Payload
-            String payload = "{\"temperature\":" + String(glob_temperature) +  
-                             ",\"humidity\":" + String(glob_humidity) + 
-                             ",\"soil_moisture\":" + String(glob_soil_moisture) + 
+      Serial.println("setValueLED: Calling Webserver_sendata");
+      Webserver_sendata(ctx, "{\"led\":\"" + String(params ? "ON" : "OFF") + "\"}");
+      return;
+    }
+
+    if (strcmp(method, "getValuePump") == 0) {
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
+
+      bool pumpOn = false;
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      pumpOn = ctx->pumpManualState;
+      xSemaphoreGive(ctx->mutexContext);
+
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), pumpOn ? "true" : "false");
+      return;
+    }
+
+    if (strcmp(method, "setValuePump") == 0) {
+      bool params = false;
+      if (doc["params"].is<bool>()) {
+        params = doc["params"].as<bool>();
+      } else {
+        params = (doc["params"].as<String>() == "true" || doc["params"].as<String>() == "1" || doc["params"].as<String>() == "ON");
+      }
+
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
+
+      Serial.printf("setValuePump: params=%s\n", params ? "true" : "false");
+      Serial.println("setValuePump: Entered setValuePump");
+      Serial.println("setValuePump: params=" + String(params));
+
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      ctx->pumpManualOverride = true;
+      ctx->pumpManualState = params;
+      xSemaphoreGive(ctx->mutexContext);
+
+      Serial.println("setValuePump: Published pumpManualState");
+
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), params ? "true" : "false");
+
+      Serial.println("setValuePump: Published responseTopic");
+
+      Webserver_sendata(ctx, "{\"pump_state\":\"" + String(params ? "ON" : "OFF") + "\"}");
+      Serial.println("setValuePump: Called Webserver_sendata");
+      return;
+    }
+
+    if (strcmp(method, "getValueMode") == 0) {
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
+
+      int modeInt = 0;
+      String modeStr = "AUTO";
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      modeInt = ctx->pumpMode;
+      modeStr = (modeInt == 1) ? "MANUAL" : "AUTO";
+      xSemaphoreGive(ctx->mutexContext);
+
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), modeStr.c_str());
+      return;
+    }
+
+    if (strcmp(method, "setValueMode") == 0) {
+      const char* params = doc["params"] | "AUTO";
+      const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
+      const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
+
+      String modeStr = String(params);
+      Serial.printf("setValueMode: params=%s\n", modeStr.c_str());
+
+      if (modeStr != "AUTO" && modeStr != "MANUAL") {
+        modeStr = "AUTO";
+      }
+
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      if (modeStr == "MANUAL") {
+        ctx->pumpMode = 1;
+        ctx->pumpController = "MANUAL";
+        ctx->pumpManualOverride = true;
+      } else {
+        ctx->pumpMode = 0;
+        ctx->pumpController = "AUTO";
+        ctx->pumpManualOverride = false;
+      }
+      xSemaphoreGive(ctx->mutexContext);
+
+      if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), modeStr.c_str());
+
+      Serial.println("setValueMode: Calling Webserver_sendata");
+      Webserver_sendata(ctx, "{\"pump_mode\":\"" + modeStr + "\", \"pump_controller\":\"" + (modeStr == "MANUAL" ? "MANUAL" : "AUTO") + "\"}");
+      return;
+    } });
+
+  unsigned long lastPublish = 0;
+
+  while (1)
+  {
+    if (!ctx->coreiotMqtt->connected())
+    {
+      if (!mqttReconnect(ctx))
+      {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        continue;
+      }
+
+      // Subscribe after connect (best-effort)
+      if (ctx->mutexMqtt)
+      {
+        xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+      }
+      ctx->coreiotMqtt->subscribe("v1/devices/me/rpc/request/+");
+      if (ctx->mutexMqtt)
+      {
+        xSemaphoreGive(ctx->mutexMqtt);
+      }
+    }
+
+    if (ctx->mutexMqtt)
+    {
+      xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+    }
+    ctx->coreiotMqtt->loop();
+    if (ctx->mutexMqtt)
+    {
+      xSemaphoreGive(ctx->mutexMqtt);
+    }
+
+    if (millis() - lastPublish >= 10000)
+    {
+      lastPublish = millis();
+
+      float t = 0.0f;
+      float h = 0.0f;
+      float soil = 0.0f;
+      int lcd = 1;
+      bool pumpState = false;
+
+      xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      t = ctx->temperature;
+      h = ctx->humidity;
+      soil = ctx->soilMoisture;
+      lcd = ctx->lcdState;
+      pumpState = ctx->pumpManualState;
+      xSemaphoreGive(ctx->mutexContext);
+
+      const String statusStr = statusTextFromState(lcd);
+
+      // Coordinates are fixed demo values (from frontend); keep them local to avoid globals.
+      constexpr float deviceLatitude = 10.880018f;
+      constexpr float deviceLongitude = 106.806336f;
+
+      const String payload = "{\"temperature\":" + String(t) +
+                             ",\"humidity\":" + String(h) +
+                             ",\"soil_moisture\":" + String(soil) +
                              ",\"system_status\":\"" + statusStr + "\"" +
+                             ",\"pump_state\":\"" + String(pumpState ? "ON" : "OFF") + "\"" +
                              ",\"lat\":" + String(deviceLatitude, 6) +
                              ",\"long\":" + String(deviceLongitude, 6) + "}";
-            
-            client.publish("v1/devices/me/telemetry", payload.c_str());
-            
-            Serial.println("Published payload: " + payload);
-        }
-        
-        vTaskDelay(10 / portTICK_PERIOD_MS);  // Yield to FreeRTOS (chạy cực mượt, không bị block)
+
+      if (ctx->mutexMqtt)
+      {
+        xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+      }
+      ctx->coreiotMqtt->publish("v1/devices/me/telemetry", payload.c_str());
+      if (ctx->mutexMqtt)
+      {
+        xSemaphoreGive(ctx->mutexMqtt);
+      }
     }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
 }
+

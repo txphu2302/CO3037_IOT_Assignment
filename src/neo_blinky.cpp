@@ -25,9 +25,9 @@ void neo_blinky(void *pvParameters){
     while(1) {                          
         if (ctx != NULL) {
             // Apply Manual Override
-            if (neo_ap_manual_override) {
-                if (neo_ap_manual_state) {
-                    strip.setPixelColor(0, strip.Color(neo_ap_color_r, neo_ap_color_g, neo_ap_color_b));
+            if (ctx->neoManualOverride) {
+                if (ctx->neoManualState) {
+                    strip.setPixelColor(0, strip.Color(ctx->neoManualR, ctx->neoManualG, ctx->neoManualB));
                 } else {
                     strip.setPixelColor(0, strip.Color(0, 0, 0));
                 }
@@ -36,7 +36,7 @@ void neo_blinky(void *pvParameters){
 
             // Wait indefinitely for a semaphore signal indicating state change
             if (xSemaphoreTake(ctx->semNeoUpdate, pdMS_TO_TICKS(100)) == pdTRUE) {
-                if (!neo_ap_manual_override) {
+                if (!ctx->neoManualOverride) {
                     xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
                     int state = ctx->neoState;
                     xSemaphoreGive(ctx->mutexContext);

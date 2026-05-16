@@ -1,24 +1,28 @@
 #include "serial_log.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "global.h"
 
-static SemaphoreHandle_t s_serial_mtx;
-
-void serialLogInit(void)
+void serialLogInit(SharedContext *ctx)
 {
-    if (s_serial_mtx == nullptr)
-        s_serial_mtx = xSemaphoreCreateMutex();
+  if (!ctx)
+    return;
+  if (ctx->mutexSerial == nullptr)
+    ctx->mutexSerial = xSemaphoreCreateMutex();
 }
 
-void serialLogLock(void)
+void serialLogLock(SharedContext *ctx)
 {
-    if (s_serial_mtx != nullptr)
-        xSemaphoreTake(s_serial_mtx, portMAX_DELAY);
+  if (!ctx)
+    return;
+  if (ctx->mutexSerial != nullptr)
+    xSemaphoreTake(ctx->mutexSerial, portMAX_DELAY);
 }
 
-void serialLogUnlock(void)
+void serialLogUnlock(SharedContext *ctx)
 {
-    if (s_serial_mtx != nullptr)
-        xSemaphoreGive(s_serial_mtx);
+  if (!ctx)
+    return;
+  if (ctx->mutexSerial != nullptr)
+    xSemaphoreGive(ctx->mutexSerial);
 }
+

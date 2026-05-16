@@ -32,6 +32,7 @@
     <div class="nav-item" onclick="showSection('settings', event)">
       <i class="fa-solid fa-gears"></i> <span>Cài đặt</span>
     </div>
+
   </div>
 
   <!-- Nội dung chính -->
@@ -42,6 +43,14 @@
       <header>
         <h1>Bảng điều khiển môi trường</h1>
         <p>Giám sát thông số theo thời gian thực</p>
+        <div class="status-bar">
+          <div class="status-pill" id="conn_ws">WS: --</div>
+          <div class="status-pill" id="conn_wifi">WiFi: --</div>
+          <div class="status-pill" id="conn_mqtt">MQTT: --</div>
+          <div class="status-pill" id="conn_ip">IP: --</div>
+          <button class="btn-mini" type="button" onclick="exportCsv()">Export CSV</button>
+          <button class="btn-mini" type="button" onclick="exportLogs()">Export Logs</button>
+        </div>
       </header>
 
       <div class="gauges-container">
@@ -119,81 +128,75 @@
         <p>AUTO / MANUAL / Lịch tưới hàng ngày.</p>
       </header>
 
-      <div class="device-list" style="grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); margin-bottom: 16px;">
-        <div class="device-card">
-          <h3>Trạng thái bơm</h3>
-          <div class="value-display status" id="pump_state_value">OFF</div>
-          <p style="margin-top:10px;color:#64748b;">Controller: <strong id="pump_controller_value">AUTO</strong></p>
+      <div class="pump-grid">
+        <div class="pump-card pump-summary">
+          <div class="pump-summary-top">
+            <div class="pump-kpi">
+              <div class="pump-kpi-title">Trạng thái</div>
+              <div class="pump-kpi-value" id="pump_state_value">OFF</div>
+              <div class="pump-kpi-sub">Controller: <strong id="pump_controller_value">AUTO</strong></div>
+            </div>
+            <div class="pump-kpi">
+              <div class="pump-kpi-title">Chế độ</div>
+              <div class="pump-kpi-value alt" id="pump_mode_value">AUTO</div>
+              <div class="pump-kpi-sub">Độ ẩm đất: <strong id="pump_soil_value">--%</strong></div>
+            </div>
+          </div>
+          <div class="pump-schedule-mini">
+            <div><span class="mini-label">Giờ:</span> <strong id="pump_schedule_view">06:00</strong></div>
+            <div><span class="mini-label">Thời lượng:</span> <strong id="pump_duration_view">15s</strong></div>
+            <div><span class="mini-label">Lịch:</span> <strong id="pump_schedule_enable_view">TẮT</strong></div>
+          </div>
         </div>
-        <div class="device-card">
-          <h3>Chế độ</h3>
-          <div class="value-display humi" id="pump_mode_value">AUTO</div>
-          <p style="margin-top:10px;color:#64748b;">Độ ẩm đất: <strong id="pump_soil_value">--%</strong></p>
-        </div>
-        <div class="device-card">
-          <h3>Lịch hôm nay</h3>
-          <p style="margin:8px 0;color:#334155;">Giờ chạy: <strong id="pump_schedule_view">06:00</strong></p>
-          <p style="margin:8px 0;color:#334155;">Thời lượng: <strong id="pump_duration_view">15s</strong></p>
-          <p style="margin:8px 0;color:#334155;">Trạng thái: <strong id="pump_schedule_enable_view">TẮT</strong></p>
-        </div>
-      </div>
 
-      <div style="display:flex; justify-content:center; margin-bottom:16px;">
-        <div class="settings-card" style="width: 100%; max-width: 420px;">
-          <h3 style="margin-bottom:12px; text-align:center;">Chọn chế độ</h3>
-          <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-            <button id="btnPumpModeAuto" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpMode('AUTO')">
+        <div class="pump-card pump-mode">
+          <h3>Chọn chế độ</h3>
+          <div class="pump-mode-buttons">
+            <button id="btnPumpModeAuto" type="button" class="btn-save pump-btn" onclick="setPumpMode('AUTO')">
               <i class="fa-solid fa-robot"></i> AUTO
             </button>
-            <button id="btnPumpModeManual" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpMode('MANUAL')">
+            <button id="btnPumpModeManual" type="button" class="btn-save pump-btn" onclick="setPumpMode('MANUAL')">
               <i class="fa-solid fa-hand"></i> MANUAL
             </button>
           </div>
+          <p class="pump-help">Gợi ý: Lưu AUTO config trước khi dùng AUTO.</p>
         </div>
-      </div>
 
-      <div style="display:flex; justify-content:center; margin-bottom:16px;">
-        <div class="settings-card" style="width:100%; max-width:1100px; padding:18px 20px;">
-          <div style="display:grid; grid-template-columns: 1fr 1px 1fr; align-items:stretch; gap:16px;">
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:4px 8px;">
-              <h3 style="margin-bottom:12px;">AUTO Config</h3>
-              <div style="width:100%; max-width:320px; display:grid; grid-template-columns: 1fr; gap:10px; margin-bottom:12px;">
-                <div class="input-group">
-                  <i class="fa-solid fa-seedling"></i>
-                  <input type="number" id="pump_threshold_input" min="0" max="100" value="40" placeholder="Ngưỡng ẩm (%)">
-                </div>
-                <div class="input-group">
-                  <i class="fa-solid fa-wave-square"></i>
-                  <input type="number" id="pump_hysteresis_input" min="1" max="30" value="5" placeholder="Hysteresis (%)">
-                </div>
-              </div>
-              <button type="button" class="btn-save" onclick="savePumpAutoConfig()">
-                <i class="fa-solid fa-floppy-disk"></i> Lưu AUTO
-              </button>
+        <div class="pump-card pump-auto" id="pump_auto_panel">
+          <h3>Cấu hình chế độ AUTO</h3>
+          <div class="pump-form">
+            <div class="input-group">
+              <i class="fa-solid fa-seedling"></i>
+              <input type="number" id="pump_threshold_input" min="0" max="100" value="40" placeholder="Ngưỡng ẩm (%)">
             </div>
-
-            <div style="background:#e2e8f0; width:1px; align-self:stretch;"></div>
-
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:4px 8px;">
-              <h3 style="margin-bottom:12px;">MANUAL Control</h3>
-              <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:10px;">
-                <button id="btnPumpOn" type="button" class="btn-save" style="padding: 8px 14px; width: 120px;" onclick="setPumpManualState('ON')">
-                  <i class="fa-solid fa-power-off"></i> ON
-                </button>
-                <button id="btnPumpOff" type="button" class="btn-save" style="padding: 8px 14px; width: 120px; background:#475569;" onclick="setPumpManualState('OFF')">
-                  <i class="fa-solid fa-power-off"></i> OFF
-                </button>
-              </div>
-              <span id="pump_manual_hint" style="display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.9rem; text-align:center;">Trạng thái hiện tại: OFF</span>
+            <p class="field-hint">Dưới ngưỡng này sẽ bơm</p>
+            <div class="input-group">
+              <i class="fa-solid fa-wave-square"></i>
+              <input type="number" id="pump_hysteresis_input" min="1" max="30" value="5" placeholder="Hysteresis (%)">
             </div>
+            <p class="field-hint">Độ trễ của máy bơm</p>
           </div>
+          <button type="button" class="btn-save pump-btn-wide" onclick="savePumpAutoConfig()">
+            <i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình
+          </button>
         </div>
-      </div>
 
-      <div style="display:flex; justify-content:center;">
-        <div class="settings-card" style="width:100%; max-width: 1100px;">
-          <h3 style="margin-bottom:12px;">Lịch tưới hàng ngày</h3>
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:10px; margin-bottom:12px;">
+        <div class="pump-card pump-manual" id="pump_manual_panel">
+          <h3>MANUAL Control</h3>
+          <div class="pump-manual-buttons">
+            <button id="btnPumpOn" type="button" class="btn-save pump-btn pump-on" onclick="setPumpManualState('ON')">
+              <i class="fa-solid fa-power-off"></i> ON
+            </button>
+            <button id="btnPumpOff" type="button" class="btn-save pump-btn pump-off" onclick="setPumpManualState('OFF')">
+              <i class="fa-solid fa-power-off"></i> OFF
+            </button>
+          </div>
+          <div id="pump_manual_hint" class="pump-hint">Trạng thái hiện tại: OFF</div>
+        </div>
+
+        <div class="pump-card pump-schedule">
+          <h3>Lịch tưới hàng ngày</h3>
+          <div class="pump-form two-col">
             <div class="input-group">
               <i class="fa-solid fa-clock"></i>
               <input type="time" id="pump_schedule_time" value="06:00">
@@ -203,11 +206,11 @@
               <input type="number" id="pump_schedule_duration" min="1" max="3600" value="15" placeholder="Thời lượng (giây)">
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; color:#334155;">
+          <div class="pump-check">
             <input type="checkbox" id="pump_schedule_enable">
             <label for="pump_schedule_enable">Bật lịch tưới tự động mỗi ngày</label>
           </div>
-          <button type="button" class="btn-save" onclick="savePumpSchedule()">
+          <button type="button" class="btn-save pump-btn-wide" onclick="savePumpSchedule()">
             <i class="fa-solid fa-calendar-check"></i> Lưu lịch
           </button>
         </div>

@@ -3,8 +3,6 @@
 #include "task_webserver.h"
 #include "risk_label.h"
 #include "serial_log.h"
-DHT20 dht20;
-LiquidCrystal_I2C lcd(0x27,16,2);
 
 static const char* statusText(int state) {
     if (state == 3) return "Critical";
@@ -13,6 +11,10 @@ static const char* statusText(int state) {
 }
 
 void temp_humi_monitor(void *pvParameters){
+
+    DHT20 dht20;
+    LiquidCrystal_I2C lcd(0x27,16,2);
+    SharedContext* ctx = (SharedContext*)pvParameters;
 
     Wire.begin(11, 12);
     Serial.begin(115200);
@@ -41,16 +43,12 @@ void temp_humi_monitor(void *pvParameters){
 
         // Check if any reads failed and exit early
         if (isnan(temperature) || isnan(humidity)) {
-            serialLogLock();
+            serialLogLock(ctx);
             Serial.println("Failed to read from DHT sensor!");
-            serialLogUnlock();
+            serialLogUnlock(ctx);
             temperature = humidity =  -1;
             //return;
         }
-
-        //Update global variables for temperature and humidity
-        glob_temperature = temperature;
-        glob_humidity = humidity;
 
         if (pvParameters != NULL) {
             SharedContext* ctx = (SharedContext*)pvParameters;
@@ -83,13 +81,13 @@ void temp_humi_monitor(void *pvParameters){
         }
 
         // Print the results (whole line under mutex — avoids interleave with TinyML Serial)
-        serialLogLock();
+        serialLogLock(ctx);
         Serial.print("Humidity: ");
         Serial.print(humidity);
         Serial.print("%  Temperature: ");
         Serial.print(temperature);
         Serial.println("°C");
-        serialLogUnlock();
+        serialLogUnlock(ctx);
 
         String statusStr = "Unknown";
         if (pvParameters != NULL) {
@@ -103,7 +101,9 @@ void temp_humi_monitor(void *pvParameters){
         String jsonStr = "{\"temperature\":" + String(temperature, 2) + 
                          ",\"humidity\":" + String(humidity, 2) + 
                          ",\"system_status\":\"" + statusStr + "\"}";
-        Webserver_sendata(jsonStr);
+        if (pvParameters != NULL) {
+            Webserver_sendata((SharedContext*)pvParameters, jsonStr);
+        }
 
         lcd.setCursor(0,0);
         lcd.print("T:");

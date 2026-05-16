@@ -1,98 +1,202 @@
 #include "pump.h"
 #include "global.h"
 #include "task_webserver.h"
-#include <time.h>
+
 #include <WiFi.h>
+#include <time.h>
+
 #define PUMP_PIN 6
 
-static bool ntpConfigured = false;
-static int lastScheduleYDay = -1;
+void task_pump(void *pvParameters)
+{
+  SharedContext *ctx = static_cast<SharedContext *>(pvParameters);
+  if (!ctx)
+  {
+    vTaskDelete(nullptr);
+    return;
+  }
 
-static void broadcastPumpState() {
-  String json = "{\"pump_state\":\"" + String(pump_actual_state ? "ON" : "OFF") +
-                "\",\"pump_mode\":\"" + String(pump_mode == 0 ? "AUTO" : "MANUAL") +
-                "\",\"pump_auto_armed\":" + String(pump_auto_armed ? "true" : "false") +
-                "\",\"pump_controller\":\"" + pump_controller +
-                "\",\"soil_moisture\":" + String(glob_soil_moisture, 2) +
-                ",\"pump_threshold\":" + String(pump_auto_threshold) +
-                ",\"pump_hysteresis\":" + String(pump_auto_hysteresis) +
-                ",\"pump_schedule_enabled\":" + String(pump_schedule_enabled ? "true" : "false") +
-                ",\"pump_schedule_time\":\"" +
-                String((pump_schedule_hour < 10 ? "0" : "")) + String(pump_schedule_hour) + ":" +
-                String((pump_schedule_minute < 10 ? "0" : "")) + String(pump_schedule_minute) +
-                "\",\"pump_schedule_duration\":" + String(pump_schedule_duration_sec) + "}";
-  Webserver_sendata(json);
-}
-
-void task_pump(void *pvParameters) {
   pinMode(PUMP_PIN, OUTPUT);
   digitalWrite(PUMP_PIN, LOW);
-  pump_actual_state = false;
+
+  bool ntpConfigured = false;
+  int lastScheduleYDay = -1;
   unsigned long scheduleEndMs = 0;
   unsigned long lastHeartbeat = 0;
   bool lastOutputState = false;
   const unsigned long autoStartupDelayMs = 6000;
 
-  while (1) {
-    if (!ntpConfigured && WiFi.status() == WL_CONNECTED) {
+  auto broadcastPumpState = [&]()
+  {
+    float soil = 0.0f;
+    bool pumpActual = false;
+    int pumpMode = 0;
+    bool pumpAutoArmed = false;
+    String pumpController;
+    int pumpThreshold = 0;
+    int pumpHysteresis = 0;
+    bool scheduleEnabled = false;
+    int scheduleHour = 0;
+    int scheduleMinute = 0;
+    int scheduleDurationSec = 0;
+
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    soil = ctx->soilMoisture;
+    pumpActual = ctx->pumpActualState;
+    pumpMode = ctx->pumpMode;
+    pumpAutoArmed = ctx->pumpAutoArmed;
+    pumpController = ctx->pumpController;
+    pumpThreshold = ctx->pumpAutoThreshold;
+    pumpHysteresis = ctx->pumpAutoHysteresis;
+    scheduleEnabled = ctx->pumpScheduleEnabled;
+    scheduleHour = ctx->pumpScheduleHour;
+    scheduleMinute = ctx->pumpScheduleMinute;
+    scheduleDurationSec = ctx->pumpScheduleDurationSec;
+    xSemaphoreGive(ctx->mutexContext);
+
+    String json = "{\"pump_state\":\"" + String(pumpActual ? "ON" : "OFF") +
+                  "\",\"pump_mode\":\"" + String(pumpMode == 0 ? "AUTO" : "MANUAL") +
+                  "\",\"pump_auto_armed\":" + String(pumpAutoArmed ? "true" : "false") +
+                  ",\"pump_controller\":\"" + pumpController +
+                  "\",\"soil_moisture\":" + String(soil, 2) +
+                  ",\"pump_threshold\":" + String(pumpThreshold) +
+                  ",\"pump_hysteresis\":" + String(pumpHysteresis) +
+                  ",\"pump_schedule_enabled\":" + String(scheduleEnabled ? "true" : "false") +
+                  ",\"pump_schedule_time\":\"" +
+                  String((scheduleHour < 10 ? "0" : "")) + String(scheduleHour) + ":" +
+                  String((scheduleMinute < 10 ? "0" : "")) + String(scheduleMinute) +
+                  "\",\"pump_schedule_duration\":" + String(scheduleDurationSec) + "}";
+    Webserver_sendata(ctx, json);
+  };
+
+  // Initialize context-side runtime values
+  xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+  ctx->pumpActualState = false;
+  ctx->pumpController = "AUTO";
+  xSemaphoreGive(ctx->mutexContext);
+
+  while (1)
+  {
+    if (!ntpConfigured && WiFi.status() == WL_CONNECTED)
+    {
       configTime(7 * 3600, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
       ntpConfigured = true;
     }
 
-    if (pump_schedule_running && millis() >= scheduleEndMs) {
-      pump_schedule_running = false;
+    // Snapshot control inputs from context
+    bool scheduleRunning = false;
+    bool scheduleEnabled = false;
+    int scheduleHour = 0;
+    int scheduleMinute = 0;
+    int scheduleDurationSec = 0;
+    int pumpMode = 0;
+    bool pumpManualOverride = false;
+    bool pumpManualState = false;
+    bool pumpAutoArmed = false;
+    float soil = 0.0f;
+    bool soilReady = false;
+    int threshold = 0;
+    int hysteresis = 0;
+    bool pumpActual = false;
+
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    scheduleRunning = ctx->pumpScheduleRunning;
+    scheduleEnabled = ctx->pumpScheduleEnabled;
+    scheduleHour = ctx->pumpScheduleHour;
+    scheduleMinute = ctx->pumpScheduleMinute;
+    scheduleDurationSec = ctx->pumpScheduleDurationSec;
+    pumpMode = ctx->pumpMode;
+    pumpManualOverride = ctx->pumpManualOverride;
+    pumpManualState = ctx->pumpManualState;
+    pumpAutoArmed = ctx->pumpAutoArmed;
+    soil = ctx->soilMoisture;
+    soilReady = ctx->soilReady;
+    threshold = ctx->pumpAutoThreshold;
+    hysteresis = ctx->pumpAutoHysteresis;
+    pumpActual = ctx->pumpActualState;
+    xSemaphoreGive(ctx->mutexContext);
+
+    if (scheduleRunning && millis() >= scheduleEndMs)
+    {
+      scheduleRunning = false;
     }
 
-    if (pump_schedule_enabled && ntpConfigured && !pump_schedule_running) {
+    if (scheduleEnabled && ntpConfigured && !scheduleRunning)
+    {
       time_t now = time(nullptr);
-      if (now > 1700000000) {
+      if (now > 1700000000)
+      {
         struct tm t;
         localtime_r(&now, &t);
-        if (t.tm_hour == pump_schedule_hour && t.tm_min == pump_schedule_minute &&
-            t.tm_yday != lastScheduleYDay) {
-          pump_schedule_running = true;
-          scheduleEndMs = millis() + (unsigned long)pump_schedule_duration_sec * 1000UL;
+        if (t.tm_hour == scheduleHour && t.tm_min == scheduleMinute && t.tm_yday != lastScheduleYDay)
+        {
+          scheduleRunning = true;
+          scheduleEndMs = millis() + (unsigned long)scheduleDurationSec * 1000UL;
           lastScheduleYDay = t.tm_yday;
         }
       }
     }
 
     bool targetPumpState = false;
-    if (pump_schedule_running) {
+    String controller = "AUTO";
+
+    if (scheduleRunning)
+    {
       targetPumpState = true;
-      pump_controller = "SCHEDULE";
-    } else if (pump_mode == 1 || pump_ap_manual_override) {
-      targetPumpState = pump_ap_manual_state;
-      pump_controller = "MANUAL";
-    } else {
-      if (!pump_auto_armed) {
+      controller = "SCHEDULE";
+    }
+    else if (pumpMode == 1 || pumpManualOverride)
+    {
+      targetPumpState = pumpManualState;
+      controller = "MANUAL";
+    }
+    else
+    {
+      if (!pumpAutoArmed)
+      {
         targetPumpState = false;
-        pump_controller = "AUTO_DISARMED";
-      } else if (!glob_soil_ready || millis() < autoStartupDelayMs) {
+        controller = "AUTO_DISARMED";
+      }
+      else if (!soilReady || millis() < autoStartupDelayMs)
+      {
         targetPumpState = false;
-        pump_controller = "AUTO_WAIT";
-      } else {
-      // AUTO with hysteresis to avoid rapid switching near threshold.
-        if (glob_soil_moisture < pump_auto_threshold) {
+        controller = "AUTO_WAIT";
+      }
+      else
+      {
+        // AUTO with hysteresis to avoid rapid switching near threshold.
+        if (soil < threshold)
+        {
           targetPumpState = true;
-        } else if (glob_soil_moisture > (pump_auto_threshold + pump_auto_hysteresis)) {
-          targetPumpState = false;
-        } else {
-          targetPumpState = pump_actual_state;
         }
-        pump_controller = "AUTO";
+        else if (soil > (threshold + hysteresis))
+        {
+          targetPumpState = false;
+        }
+        else
+        {
+          targetPumpState = pumpActual;
+        }
+        controller = "AUTO";
       }
     }
 
     digitalWrite(PUMP_PIN, targetPumpState ? HIGH : LOW);
-    pump_actual_state = targetPumpState;
 
-    if (pump_actual_state != lastOutputState || (millis() - lastHeartbeat) > 5000) {
-      lastOutputState = pump_actual_state;
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    ctx->pumpScheduleRunning = scheduleRunning;
+    ctx->pumpActualState = targetPumpState;
+    ctx->pumpController = controller;
+    xSemaphoreGive(ctx->mutexContext);
+
+    if (targetPumpState != lastOutputState || (millis() - lastHeartbeat) > 5000)
+    {
+      lastOutputState = targetPumpState;
       lastHeartbeat = millis();
       broadcastPumpState();
     }
 
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
+

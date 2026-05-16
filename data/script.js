@@ -1,6 +1,36 @@
 // ==================== WEBSOCKET ====================
 var websocket;
 var wsRetryTimer = null;
+var statusPollTimer = null;
+var _staIpNotified = false;
+
+function ensureToastHost() {
+    let host = document.querySelector('.toast-host');
+    if (!host) {
+        host = document.createElement('div');
+        host.className = 'toast-host';
+        document.body.appendChild(host);
+    }
+    return host;
+}
+
+function showToast(message, type = "info", timeoutMs = 2600) {
+    const host = ensureToastHost();
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = message;
+    host.appendChild(el);
+    setTimeout(() => {
+        try { host.removeChild(el); } catch (_) { }
+    }, timeoutMs);
+}
+
+function setPill(el, text, level /* ok|warn|bad */) {
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('ok', 'warn', 'bad');
+    if (level) el.classList.add(level);
+}
 
 function buildGateway() {
     const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -27,6 +57,7 @@ let map;
 function onLoad(event) {
     initWebSocket();
     initChart();
+    startStatusPolling();
 
     // Nếu có div#map thì khởi tạo bản đồ (Chỉ STA mode mới có)
     if (document.getElementById("map")) {
@@ -74,11 +105,13 @@ function logEvent(msg, type = "info") {
 function onOpen(event) {
     console.log('Connection opened');
     logEvent("Đã kết nối với ESP32 (WebSocket)", "info");
+    setPill(document.getElementById("conn_ws"), "WS: OK", "ok");
 }
 
 function onClose(event) {
     console.log('Connection closed');
     logEvent("Mất kết nối! Đang thử lại...", "crit");
+    setPill(document.getElementById("conn_ws"), "WS: OFF", "bad");
     if (wsRetryTimer) clearTimeout(wsRetryTimer);
     wsRetryTimer = setTimeout(initWebSocket, 2000);
 }
@@ -155,8 +188,112 @@ function Send_Data(data) {
         console.log("📤 Gửi:", data);
     } else {
         console.warn("⚠️ WebSocket chưa sẵn sàng!");
-        alert("⚠️ WebSocket chưa kết nối!");
+        showToast("WebSocket chưa kết nối. Vui lòng thử lại.", "warn");
     }
+}
+
+function startStatusPolling() {
+    if (!document.getElementById("conn_wifi")) return;
+    if (statusPollTimer) clearInterval(statusPollTimer);
+
+    const tick = () => {
+        fetch('/api/status', { cache: "no-store" })
+            .then(r => r.json())
+            .then(s => {
+                const wifiOk = !!s.wifi_connected;
+                const mqttOk = !!s.mqtt_connected;
+
+                setPill(
+                    document.getElementById("conn_wifi"),
+                    wifiOk ? `WiFi: OK (${s.wifi_rssi} dBm)` : "WiFi: OFF",
+                    wifiOk ? "ok" : "bad"
+                );
+
+                if (document.getElementById("conn_mqtt")) {
+                    setPill(document.getElementById("conn_mqtt"), mqttOk ? "MQTT: OK" : "MQTT: OFF", mqttOk ? "ok" : "warn");
+                }
+                if (document.getElementById("conn_ip")) {
+                    setPill(document.getElementById("conn_ip"), s.ip ? `IP: ${s.ip}` : "IP: --", s.ip ? "ok" : "warn");
+                }
+
+                // On AP page: once STA gets an IP, show a prominent toast with the URL to open.
+                if (!_staIpNotified && s && s.ip && (s.mode === "AP+STA" || s.mode === "AP")) {
+                    _staIpNotified = true;
+                    showToast(`STA IP: ${s.ip}  (mở: http://${s.ip}/)`, "ok", 12000);
+                }
+
+                const wsEl = document.getElementById("conn_ws");
+                if (wsEl && typeof s.ws_clients === "number") {
+                    const base = wsEl.textContent.includes("OK") ? "WS: OK" : (wsEl.textContent.includes("OFF") ? "WS: OFF" : "WS: --");
+                    wsEl.textContent = `${base} (${s.ws_clients})`;
+                }
+            })
+            .catch(_ => { });
+    };
+
+    tick();
+    statusPollTimer = setInterval(tick, 2000);
+}
+
+function exportCsv() {
+    if (!envChart || !envChart.data || !envChart.data.labels) {
+        showToast("Chưa có dữ liệu để export.", "warn");
+        return;
+    }
+
+    const labels = envChart.data.labels;
+    const t = envChart.data.datasets?.[0]?.data || [];
+    const h = envChart.data.datasets?.[1]?.data || [];
+    const s = envChart.data.datasets?.[2]?.data || [];
+
+    if (!labels.length) {
+        showToast("Chưa có dữ liệu để export.", "warn");
+        return;
+    }
+
+    let csv = "time,temperature_c,humidity_pct,soil_pct\n";
+    for (let i = 0; i < labels.length; i++) {
+        csv += `${labels[i]},${t[i] ?? ""},${h[i] ?? ""},${s[i] ?? ""}\n`;
+    }
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `env_log_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast("Đã export CSV.", "ok");
+}
+
+function exportLogs() {
+    const logsEl = document.getElementById("eventLogs");
+    if (!logsEl) {
+        showToast("Trang này không có logs.", "warn");
+        return;
+    }
+    const lines = [];
+    logsEl.querySelectorAll("li").forEach(li => {
+        const txt = (li.innerText || "").trim();
+        if (txt) lines.push(txt);
+    });
+    if (!lines.length || (lines.length === 1 && lines[0].includes("Chưa có dữ liệu"))) {
+        showToast("Chưa có logs để export.", "warn");
+        return;
+    }
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `system_log_${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Đã export logs.", "ok");
 }
 
 function onMessage(event) {
@@ -443,6 +580,15 @@ function updatePumpUI() {
     const modeEl = document.getElementById("pump_mode_value");
     if (modeEl) modeEl.innerText = pumpMode;
 
+    // Show AUTO config OR MANUAL control depending on selected mode
+    const autoPanel = document.getElementById("pump_auto_panel");
+    const manualPanel = document.getElementById("pump_manual_panel");
+    if (autoPanel && manualPanel) {
+        const isAuto = (pumpMode === "AUTO");
+        autoPanel.style.display = isAuto ? "block" : "none";
+        manualPanel.style.display = isAuto ? "none" : "block";
+    }
+
     const controllerEl = document.getElementById("pump_controller_value");
     if (controllerEl) {
         let controllerText = pumpController;
@@ -496,7 +642,7 @@ function savePumpAutoConfig() {
         }
     }));
     pumpAutoArmed = true;
-    alert("Đã lưu AUTO config. Chế độ AUTO được kích hoạt.");
+    showToast("Đã lưu AUTO config. Chế độ AUTO được kích hoạt.", "ok", 3200);
 }
 
 function savePumpSchedule() {
@@ -520,7 +666,7 @@ function savePumpSchedule() {
     if (viewDuration) viewDuration.innerText = `${duration}s`;
     const viewEnabled = document.getElementById("pump_schedule_enable_view");
     if (viewEnabled) viewEnabled.innerText = enabled ? "BẬT" : "TẮT";
-    alert("Đã lưu lịch tưới.");
+    showToast("Đã lưu lịch tưới.", "ok", 2600);
 }
 
 function setPumpManualState(state) {
@@ -574,6 +720,15 @@ document.getElementById("settingsForm").addEventListener("submit", function (e) 
         const ssid = ssidInput.value.trim();
         const password = document.getElementById("password").value.trim();
 
+        if (!ssid) {
+            showToast("SSID không được để trống.", "bad");
+            return;
+        }
+        if (password.length > 0 && password.length < 8) {
+            showToast("Mật khẩu WiFi tối thiểu 8 ký tự (hoặc để trống nếu WiFi mở).", "bad", 3800);
+            return;
+        }
+
         const settingsJSON = JSON.stringify({
             page: "setting",
             value: {
@@ -586,12 +741,44 @@ document.getElementById("settingsForm").addEventListener("submit", function (e) 
         });
 
         Send_Data(settingsJSON);
-        alert("✅ Lưu cấu hình thành công! Thiết bị đang khởi động lại để kết nối WiFi...");
+        showToast("Đã lưu WiFi. Nếu bị rớt AP, hãy kết nối lại AP và xem IP STA ở thanh trạng thái.", "ok", 5200);
+
+        // After device reconnects (or finishes connecting STA), poll status to show STA IP for user.
+        let tries = 0;
+        const timer = setInterval(() => {
+            tries++;
+            fetch('/api/status', { cache: "no-store" })
+                .then(r => r.json())
+                .then(s => {
+                    if (s && s.ip) {
+                        showToast(`STA IP: ${s.ip}  (mở: http://${s.ip}/)`, "ok", 9000);
+                        clearInterval(timer);
+                    }
+                })
+                .catch(_ => { });
+            if (tries > 60) { // ~60s
+                clearInterval(timer);
+            }
+        }, 1000);
     } else if (mqttTokenInput) {
         // --- Form cấu hình MQTT Core IoT (STA Mode) ---
         const token = mqttTokenInput.value.trim();
         const server = document.getElementById("mqtt_server").value.trim();
         const port = document.getElementById("mqtt_port").value.trim();
+
+        if (!token || token.length < 10) {
+            showToast("Token không hợp lệ (quá ngắn).", "bad");
+            return;
+        }
+        if (!server) {
+            showToast("Server không được để trống.", "bad");
+            return;
+        }
+        const portNum = parseInt(port, 10);
+        if (!Number.isFinite(portNum) || portNum < 1 || portNum > 65535) {
+            showToast("Port không hợp lệ (1..65535).", "bad");
+            return;
+        }
 
         const settingsJSON = JSON.stringify({
             page: "setting",
@@ -606,6 +793,6 @@ document.getElementById("settingsForm").addEventListener("submit", function (e) 
         });
 
         Send_Data(settingsJSON);
-        alert("✅ Lưu cấu hình thành công! Đã gửi thông số Core IoT đến thiết bị...");
+        showToast("Đã gửi cấu hình MQTT. Thiết bị sẽ dùng cấu hình mới.", "ok", 3800);
     }
 });

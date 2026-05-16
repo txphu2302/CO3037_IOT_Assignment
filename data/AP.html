@@ -28,6 +28,7 @@
     <div class="nav-item active" onclick="showSection('home', event)">🏠 <span>Trang chủ</span></div>
     <div class="nav-item" onclick="showSection('device', event)">⚡ <span>Thiết bị</span></div>
     <div class="nav-item" onclick="showSection('settings', event)">⚙️ <span>Cài đặt</span></div>
+
   </div>
 
   <!-- Nội dung chính -->
@@ -38,6 +39,16 @@
       <header>
         <h1>Bảng điều khiển môi trường</h1>
         <p>Giám sát nhiệt độ, độ ẩm và độ ẩm đất theo thời gian thực</p>
+        <div class="status-bar">
+          <div class="status-pill" id="conn_ws">WS: --</div>
+          <div class="status-pill" id="conn_wifi">WiFi: AP</div>
+          <div class="status-pill" id="conn_ip">IP: --</div>
+          <button class="btn-mini" type="button" onclick="exportCsv()">Export CSV</button>
+          <button class="btn-mini" type="button" onclick="exportLogs()">Export Logs</button>
+        </div>
+        <p style="margin:10px 0 0 0; color:#64748b; font-size:13px;">
+          Sau khi kết nối WiFi, IP STA sẽ hiện ở đây để bạn mở trang STA (webserver).
+        </p>
       </header>
 
       <div class="gauges-container">

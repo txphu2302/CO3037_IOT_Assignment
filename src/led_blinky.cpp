@@ -17,8 +17,8 @@ void led_blinky(void *pvParameters){
         else delay_ms = 1000;
     }
 
-    if (led_ap_manual_override) {
-        digitalWrite(LED_GPIO, led_ap_manual_state ? HIGH : LOW);
+    if (ctx && ctx->ledManualOverride) {
+        digitalWrite(LED_GPIO, ctx->ledManualState ? HIGH : LOW);
         vTaskDelay(pdMS_TO_TICKS(100));
         continue;
     }

@@ -1,8 +1,14 @@
 #include <task_handler.h>
 #include "global.h"
+#include "task_check_info.h"
+#include "task_webserver.h"
+#include "coreiot.h"
 
-void handleWebSocketMessage(String message)
+void handleWebSocketMessage(SharedContext *ctx, const String &message)
 {
+    if (!ctx) {
+        return;
+    }
     Serial.println(message);
     // Buffer 512 để tránh tràn khi SSID/Pass dài
     StaticJsonDocument<512> doc;
@@ -47,26 +53,42 @@ void handleWebSocketMessage(String message)
             String mode = doc["value"]["mode"].as<String>();
             if (mode == "MANUAL")
             {
-                pump_mode = 1;
-                pump_ap_manual_override = true;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpMode = 1;
+                ctx->pumpManualOverride = true;
+                xSemaphoreGive(ctx->mutexContext);
             }
             else
             {
-                pump_mode = 0;
-                pump_ap_manual_override = false;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpMode = 0;
+                ctx->pumpManualOverride = false;
+                xSemaphoreGive(ctx->mutexContext);
             }
+
+            // Sync to other web clients
+            Webserver_sendata(ctx, "{\"pump_mode\":\"" + mode + "\"}");
+
+            // Sync to CoreIOT attributes (best-effort)
+            coreiot_publish_attribute(ctx, "modeState", mode == "MANUAL");
         }
         else if (action == "toggle_manual")
         {
-            pump_mode = 1;
-            pump_ap_manual_override = true;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            ctx->pumpMode = 1;
+            ctx->pumpManualOverride = true;
+            xSemaphoreGive(ctx->mutexContext);
             if (doc["value"].containsKey("state"))
             {
-                pump_ap_manual_state = doc["value"]["state"].as<bool>();
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpManualState = doc["value"]["state"].as<bool>();
+                xSemaphoreGive(ctx->mutexContext);
             }
             else
             {
-                pump_ap_manual_state = !pump_ap_manual_state;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpManualState = !ctx->pumpManualState;
+                xSemaphoreGive(ctx->mutexContext);
             }
         }
         else if (action == "set_auto")
@@ -76,30 +98,40 @@ void handleWebSocketMessage(String message)
                 int threshold = doc["value"]["threshold"].as<int>();
                 if (threshold < 0) threshold = 0;
                 if (threshold > 100) threshold = 100;
-                pump_auto_threshold = threshold;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpAutoThreshold = threshold;
+                xSemaphoreGive(ctx->mutexContext);
             }
             if (doc["value"].containsKey("hysteresis"))
             {
                 int hysteresis = doc["value"]["hysteresis"].as<int>();
                 if (hysteresis < 1) hysteresis = 1;
                 if (hysteresis > 30) hysteresis = 30;
-                pump_auto_hysteresis = hysteresis;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpAutoHysteresis = hysteresis;
+                xSemaphoreGive(ctx->mutexContext);
             }
             // Arm AUTO only when user explicitly saves AUTO config.
-            pump_auto_armed = true;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            ctx->pumpAutoArmed = true;
+            xSemaphoreGive(ctx->mutexContext);
         }
         else if (action == "set_schedule")
         {
             if (doc["value"].containsKey("enabled"))
             {
-                pump_schedule_enabled = doc["value"]["enabled"].as<bool>();
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpScheduleEnabled = doc["value"]["enabled"].as<bool>();
+                xSemaphoreGive(ctx->mutexContext);
             }
             if (doc["value"].containsKey("duration"))
             {
                 int duration = doc["value"]["duration"].as<int>();
                 if (duration < 1) duration = 1;
                 if (duration > 3600) duration = 3600;
-                pump_schedule_duration_sec = duration;
+                xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                ctx->pumpScheduleDurationSec = duration;
+                xSemaphoreGive(ctx->mutexContext);
             }
 
             if (doc["value"].containsKey("time"))
@@ -110,8 +142,10 @@ void handleWebSocketMessage(String message)
                 {
                     int h = hhmm.substring(0, sep).toInt();
                     int m = hhmm.substring(sep + 1).toInt();
-                    if (h >= 0 && h <= 23) pump_schedule_hour = h;
-                    if (m >= 0 && m <= 59) pump_schedule_minute = m;
+                    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+                    if (h >= 0 && h <= 23) ctx->pumpScheduleHour = h;
+                    if (m >= 0 && m <= 59) ctx->pumpScheduleMinute = m;
+                    xSemaphoreGive(ctx->mutexContext);
                 }
             }
         }
@@ -126,15 +160,19 @@ void handleWebSocketMessage(String message)
 
         // Nếu form gửi từ STA Mode (chỉ điền MQTT), giữ nguyên WiFi cũ
         if (WIFI_SSID_NEW == "STA_MODE_KEEP") {
-            WIFI_SSID_NEW = WIFI_SSID;
-            WIFI_PASS_NEW = WIFI_PASS;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            WIFI_SSID_NEW = ctx->wifiSsid;
+            WIFI_PASS_NEW = ctx->wifiPass;
+            xSemaphoreGive(ctx->mutexContext);
         }
 
         // Nếu form gửi từ AP Mode (chỉ điền WiFi), giữ nguyên MQTT cũ
         if (CORE_IOT_TOKEN_NEW == "") {
-            CORE_IOT_TOKEN_NEW  = CORE_IOT_TOKEN;
-            CORE_IOT_SERVER_NEW = CORE_IOT_SERVER;
-            CORE_IOT_PORT_NEW   = CORE_IOT_PORT;
+            xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+            CORE_IOT_TOKEN_NEW  = ctx->coreIotToken;
+            CORE_IOT_SERVER_NEW = ctx->coreIotServer;
+            CORE_IOT_PORT_NEW   = ctx->coreIotPort;
+            xSemaphoreGive(ctx->mutexContext);
         }
 
         Serial.println("📥 Nhận cấu hình từ WebSocket:");
@@ -146,9 +184,9 @@ void handleWebSocketMessage(String message)
 
         // Phản hồi lại client trước khi restart
         String msg = "{\"status\":\"ok\",\"page\":\"setting_saved\"}";
-        ws.textAll(msg);
+        Webserver_sendata(ctx, msg);
 
         // Lưu cấu hình → ESP sẽ restart bên trong hàm này
-        Save_info_File(WIFI_SSID_NEW, WIFI_PASS_NEW, CORE_IOT_TOKEN_NEW, CORE_IOT_SERVER_NEW, CORE_IOT_PORT_NEW);
+        Save_info_File(ctx, WIFI_SSID_NEW, WIFI_PASS_NEW, CORE_IOT_TOKEN_NEW, CORE_IOT_SERVER_NEW, CORE_IOT_PORT_NEW);
     }
 }

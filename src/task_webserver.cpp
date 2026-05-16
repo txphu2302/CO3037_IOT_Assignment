@@ -1,45 +1,45 @@
 #include "task_webserver.h"
 #include "coreiot.h"
+
 #include <WiFi.h>
 
-
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
-
-bool webserver_isrunning = false;
-
-void Webserver_sendata(String data) {
-  if (ws.count() > 0) {
-    ws.textAll(data); // Gửi đến tất cả client đang kết nối
-    Serial.println("📤 Đã gửi dữ liệu qua WebSocket: " + data);
-  } else {
-    Serial.println("⚠️ Không có client WebSocket nào đang kết nối!");
+static void connectWSV(SharedContext *ctx)
+{
+  if (!ctx || !ctx->webServer || !ctx->webSocket)
+  {
+    return;
   }
-}
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
-             AwsEventType type, void *arg, uint8_t *data, size_t len) {
-  if (type == WS_EVT_CONNECT) {
-    Serial.printf("WebSocket client #%u connected from %s\n", client->id(),
-                  client->remoteIP().toString().c_str());
-  } else if (type == WS_EVT_DISCONNECT) {
-    Serial.printf("WebSocket client #%u disconnected\n", client->id());
-  } else if (type == WS_EVT_DATA) {
-    AwsFrameInfo *info = (AwsFrameInfo *)arg;
-
-    if (info->opcode == WS_TEXT) {
-      String message;
-      message += String((char *)data).substring(0, len);
-      // parseJson(message, true);
-      handleWebSocketMessage(message);
+  ctx->webSocket->onEvent([ctx](AsyncWebSocket *server, AsyncWebSocketClient *client,
+                                AwsEventType type, void *arg, uint8_t *data, size_t len)
+                          {
+    (void)server;
+    if (type == WS_EVT_CONNECT) {
+      Serial.printf("WebSocket client #%u connected from %s\n",
+                    client->id(), client->remoteIP().toString().c_str());
+      return;
     }
-  }
-}
+    if (type == WS_EVT_DISCONNECT) {
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      return;
+    }
+    if (type != WS_EVT_DATA) {
+      return;
+    }
 
-void connnectWSV() {
-  ws.onEvent(onEvent);
-  server.addHandler(&ws);
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AwsFrameInfo *info = (AwsFrameInfo *)arg;
+    if (info->opcode != WS_TEXT) {
+      return;
+    }
+
+    String message;
+    message += String((char *)data).substring(0, len);
+    handleWebSocketMessage(ctx, message); });
+
+  ctx->webServer->addHandler(ctx->webSocket);
+
+  ctx->webServer->on("/", HTTP_GET, [ctx](AsyncWebServerRequest *request)
+                     {
     const IPAddress localIp = request->client()->localIP();
 
     // Serve page by interface that received the request:
@@ -56,75 +56,118 @@ void connnectWSV() {
     }
 
     // Fallback: keep AP setup reachable even in ambiguous states.
-    request->send(LittleFS, "/AP.html", "text/html");
-  });
-  server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/script.js", "application/javascript");
-  });
-  server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/styles.css", "text/css");
-  });
-  server.on("/chart.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/chart.js", "application/javascript");
-  });
+    request->send(LittleFS, "/AP.html", "text/html"); });
 
-  server.on("/toggle-led", HTTP_GET, [](AsyncWebServerRequest *request) {
-    led_ap_manual_override = true;
-    led_ap_manual_state = !led_ap_manual_state;
-    request->send(200, "text/plain", led_ap_manual_state ? "ON" : "OFF");
+  ctx->webServer->on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
+                     { request->send(LittleFS, "/script.js", "application/javascript"); });
+  ctx->webServer->on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request)
+                     { request->send(LittleFS, "/styles.css", "text/css"); });
+  ctx->webServer->on("/chart.js", HTTP_GET, [](AsyncWebServerRequest *request)
+                     { request->send(LittleFS, "/chart.js", "application/javascript"); });
 
-    // Đồng bộ cho các tab Web khác
-    String wsMsg =
-        "{\"led\":\"" + String(led_ap_manual_state ? "ON" : "OFF") + "\"}";
-    Webserver_sendata(wsMsg);
+  // Status endpoint for UI (STA/AP): WiFi + MQTT + WebSocket clients
+  ctx->webServer->on("/api/status", HTTP_GET, [ctx](AsyncWebServerRequest *request)
+                     {
+    String mode = "UNKNOWN";
+    const wifi_mode_t m = WiFi.getMode();
+    if (m == WIFI_AP) mode = "AP";
+    else if (m == WIFI_STA) mode = "STA";
+    else if (m == WIFI_AP_STA) mode = "AP+STA";
 
-    // Đồng bộ lên CoreIOT
-    coreiot_publish_attribute("ledState", led_ap_manual_state);
-  });
+    const bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+    const int rssi = wifiConnected ? WiFi.RSSI() : 0;
+    const String ip = wifiConnected ? WiFi.localIP().toString() : String("");
+    const String apIp = WiFi.softAPIP().toString();
 
-  server.on("/toggle-neo", HTTP_GET, [](AsyncWebServerRequest *request) {
+    bool mqttConnected = false;
+    if (ctx->coreiotMqtt) {
+      if (ctx->mutexMqtt) xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+      mqttConnected = ctx->coreiotMqtt->connected();
+      if (ctx->mutexMqtt) xSemaphoreGive(ctx->mutexMqtt);
+    }
+
+    const int wsClients = (ctx->webSocket) ? (int)ctx->webSocket->count() : 0;
+
+    String json = "{";
+    json += "\"mode\":\"" + mode + "\"";
+    json += ",\"wifi_connected\":" + String(wifiConnected ? "true" : "false");
+    json += ",\"wifi_rssi\":" + String(rssi);
+    json += ",\"ip\":\"" + ip + "\"";
+    json += ",\"ap_ip\":\"" + apIp + "\"";
+    json += ",\"mqtt_connected\":" + String(mqttConnected ? "true" : "false");
+    json += ",\"ws_clients\":" + String(wsClients);
+    json += "}";
+    request->send(200, "application/json", json); });
+
+  ctx->webServer->on("/toggle-led", HTTP_GET, [ctx](AsyncWebServerRequest *request)
+                     {
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    ctx->ledManualOverride = true;
+    ctx->ledManualState = !ctx->ledManualState;
+    const bool nowOn = ctx->ledManualState;
+    xSemaphoreGive(ctx->mutexContext);
+
+    request->send(200, "text/plain", nowOn ? "ON" : "OFF");
+
+    // Sync to other web clients
+    Webserver_sendata(ctx, "{\"led\":\"" + String(nowOn ? "ON" : "OFF") + "\"}");
+
+    // Sync to CoreIOT attributes (best-effort)
+    coreiot_publish_attribute(ctx, "ledState", nowOn); });
+
+  ctx->webServer->on("/toggle-neo", HTTP_GET, [ctx](AsyncWebServerRequest *request)
+                     {
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
     if (request->hasParam("color")) {
       String colorHex = request->getParam("color")->value();
       if (colorHex.startsWith("#")) {
         long number = strtol(&colorHex[1], NULL, 16);
-        neo_ap_color_r = number >> 16;
-        neo_ap_color_g = number >> 8 & 0xFF;
-        neo_ap_color_b = number & 0xFF;
+        ctx->neoManualR = number >> 16;
+        ctx->neoManualG = number >> 8 & 0xFF;
+        ctx->neoManualB = number & 0xFF;
       }
-      // Nếu có gửi màu thì luôn luôn BẬT
-      neo_ap_manual_state = true;
+      ctx->neoManualState = true;
     } else {
-      // Nếu không gửi màu thì TẮT/BẬT tuần tự
-      neo_ap_manual_state = !neo_ap_manual_state;
+      ctx->neoManualState = !ctx->neoManualState;
     }
-    neo_ap_manual_override = true;
-    request->send(200, "text/plain", neo_ap_manual_state ? "ON" : "OFF");
-  });
+    ctx->neoManualOverride = true;
+    const bool nowOn = ctx->neoManualState;
+    xSemaphoreGive(ctx->mutexContext);
 
-  server.on("/toggle-pump", HTTP_GET, [](AsyncWebServerRequest *request) {
-    pump_mode = 1; // MANUAL
-    pump_ap_manual_override = true;
+    request->send(200, "text/plain", nowOn ? "ON" : "OFF"); });
+
+  ctx->webServer->on("/toggle-pump", HTTP_GET, [ctx](AsyncWebServerRequest *request)
+                     {
+    bool target = false;
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    ctx->pumpMode = 1; // MANUAL
+    ctx->pumpManualOverride = true;
     if (request->hasParam("state")) {
       String state = request->getParam("state")->value();
-      pump_ap_manual_state = state.equalsIgnoreCase("ON");
+      ctx->pumpManualState = state.equalsIgnoreCase("ON");
     } else {
-      pump_ap_manual_state = !pump_ap_manual_state;
+      ctx->pumpManualState = !ctx->pumpManualState;
     }
-    request->send(200, "text/plain", pump_ap_manual_state ? "ON" : "OFF");
+    target = ctx->pumpManualState;
+    xSemaphoreGive(ctx->mutexContext);
 
-    String wsMsg = "{\"pump_state\":\"" + String(pump_ap_manual_state ? "ON" : "OFF") +
-                   "\",\"pump_mode\":\"MANUAL\",\"pump_controller\":\"MANUAL\"}";
-    Webserver_sendata(wsMsg);
-  });
+    request->send(200, "text/plain", target ? "ON" : "OFF");
+
+    // Sync to other web clients
+    Webserver_sendata(ctx, "{\"pump_state\":\"" + String(target ? "ON" : "OFF") + "\"}");
+
+    // Sync to CoreIOT attributes (best-effort)
+    coreiot_publish_attribute(ctx, "pumpState", target); });
 
   // Kick off async scan (non-blocking, returns immediately)
-  server.on("/scan/start", HTTP_GET, [](AsyncWebServerRequest *request) {
-    WiFi.scanNetworks(true); // true = async
-    request->send(200, "application/json", "{\"status\":\"scanning\"}");
-  });
+  ctx->webServer->on("/scan/start", HTTP_GET, [](AsyncWebServerRequest *request)
+                     {
+    WiFi.scanNetworks(true); // async
+    request->send(200, "application/json", "{\"status\":\"scanning\"}"); });
 
   // Poll for scan results
-  server.on("/scan/result", HTTP_GET, [](AsyncWebServerRequest *request) {
+  ctx->webServer->on("/scan/result", HTTP_GET, [](AsyncWebServerRequest *request)
+                     {
     int16_t n = WiFi.scanComplete();
     if (n == WIFI_SCAN_RUNNING) {
       request->send(200, "application/json", "{\"status\":\"scanning\"}");
@@ -137,34 +180,67 @@ void connnectWSV() {
     }
     String json = "{\"status\":\"ready\",\"networks\":[";
     for (int i = 0; i < n; ++i) {
-      if (i)
-        json += ",";
-      String enc =
-          (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "false" : "true";
+      if (i) json += ",";
+      String enc = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "false" : "true";
       json += "{\"ssid\":\"" + WiFi.SSID(i) +
-              "\",\"rssi\":" + String(WiFi.RSSI(i)) + ",\"secure\":" + enc +
-              "}";
+              "\",\"rssi\":" + String(WiFi.RSSI(i)) +
+              ",\"secure\":" + enc + "}";
     }
     json += "]}";
-    WiFi.scanDelete(); // Giải phóng bộ nhớ
-    request->send(200, "application/json", json);
-  });
+    WiFi.scanDelete();
+    request->send(200, "application/json", json); });
 
-  server.begin();
-  ElegantOTA.begin(&server);
-  webserver_isrunning = true;
+  ctx->webServer->begin();
+  ElegantOTA.begin(ctx->webServer);
+  ctx->webServerRunning = true;
 }
 
-void Webserver_stop() {
-  ws.closeAll();
-  server.end();
-  webserver_isrunning = false;
-}
-
-void Webserver_reconnect() {
-  if (!webserver_isrunning) {
-    connnectWSV();
+void Webserver_sendata(SharedContext *ctx, const String &data)
+{
+  Serial.printf("Webserver_sendata: data=%s\n", data.c_str());
+  if (!ctx || !ctx->webSocket)
+  {
+    Serial.println("Webserver_sendata: ctx or webSocket is null");
+    return;
   }
+
+  int clientCount = ctx->webSocket->count();
+  Serial.printf("Webserver_sendata: clientCount=%d\n", clientCount);
+
+  if (clientCount > 0)
+  {
+    ctx->webSocket->textAll(data);
+    Serial.println("Webserver_sendata: Sent to clients");
+  }
+  else
+  {
+    Serial.println("Webserver_sendata: No clients connected");
+  }
+}
+
+void Webserver_stop(SharedContext *ctx)
+{
+  if (!ctx || !ctx->webServer || !ctx->webSocket)
+  {
+    return;
+  }
+
+  ctx->webSocket->closeAll();
+  ctx->webServer->end();
+  ctx->webServerRunning = false;
+}
+
+void Webserver_reconnect(SharedContext *ctx)
+{
+  if (!ctx)
+  {
+    return;
+  }
+
+  if (!ctx->webServerRunning)
+  {
+    connectWSV(ctx);
+  }
+
   ElegantOTA.loop();
 }
-
