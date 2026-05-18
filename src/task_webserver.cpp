@@ -119,6 +119,10 @@ static void connectWSV(SharedContext *ctx) {
         ctx->ledManualOverride = true;
         ctx->ledManualState = !ctx->ledManualState;
         const bool nowOn = ctx->ledManualState;
+        // Đặt flag để coreiot_task publish ledState attribute an toàn
+        // trong vòng lặp của nó (tránh race condition với mutexMqtt)
+        ctx->pendingLedAttributeUpdate = true;
+        ctx->pendingLedAttributeValue = nowOn;
         xSemaphoreGive(ctx->mutexContext);
 
         request->send(200, "text/plain", nowOn ? "ON" : "OFF");
@@ -126,9 +130,6 @@ static void connectWSV(SharedContext *ctx) {
         // Sync to other web clients
         Webserver_sendata(ctx,
                           "{\"led\":\"" + String(nowOn ? "ON" : "OFF") + "\"}");
-
-        // Sync to CoreIOT attributes (best-effort)
-        coreiot_publish_attribute(ctx, "ledState", nowOn);
       });
 
   ctx->webServer->on("/toggle-neo", HTTP_GET,

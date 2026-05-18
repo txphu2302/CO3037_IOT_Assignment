@@ -134,9 +134,16 @@ void coreiot_task(void *pvParameters)
       ctx->ledManualState = params;
       xSemaphoreGive(ctx->mutexContext);
 
+      // Gửi RPC response về CoreIOT
       if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), params ? "true" : "false");
 
-      Serial.println("setValueLED: Calling Webserver_sendata");
+      // Đồng bộ attribute ledState về CoreIOT (direct publish, không mutex vì đang trong callback)
+      if (ctx->coreiotMqtt && ctx->coreiotMqtt->connected()) {
+        String attrPayload = String("{\"ledState\":") + (params ? "true" : "false") + "}";
+        ctx->coreiotMqtt->publish("v1/devices/me/attributes", attrPayload.c_str());
+      }
+
+      // Đồng bộ lên tất cả browser đang mở webserver
       Webserver_sendata(ctx, "{\"led\":\"" + String(params ? "ON" : "OFF") + "\"}");
       return;
     }
@@ -272,6 +279,26 @@ void coreiot_task(void *pvParameters)
     if (ctx->mutexMqtt)
     {
       xSemaphoreGive(ctx->mutexMqtt);
+    }
+
+    // Xử lý pending LED attribute update từ webserver HTTP handler
+    // Flag được set bên trong mutexContext (an toàn), publish ở đây (trong coreiot_task)
+    // để tránh race condition khi gọi publish từ 2 task khác nhau.
+    bool doLedAttr = false;
+    bool ledAttrVal = false;
+    xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+    if (ctx->pendingLedAttributeUpdate) {
+      doLedAttr = true;
+      ledAttrVal = ctx->pendingLedAttributeValue;
+      ctx->pendingLedAttributeUpdate = false;
+    }
+    xSemaphoreGive(ctx->mutexContext);
+
+    if (doLedAttr && ctx->coreiotMqtt && ctx->coreiotMqtt->connected()) {
+      String attrPayload = String("{\"ledState\":") + (ledAttrVal ? "true" : "false") + "}";
+      if (ctx->mutexMqtt) xSemaphoreTake(ctx->mutexMqtt, portMAX_DELAY);
+      ctx->coreiotMqtt->publish("v1/devices/me/attributes", attrPayload.c_str());
+      if (ctx->mutexMqtt) xSemaphoreGive(ctx->mutexMqtt);
     }
 
     if (millis() - lastPublish >= 10000)

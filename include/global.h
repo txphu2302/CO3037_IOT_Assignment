@@ -71,6 +71,11 @@ struct SharedContext {
   PubSubClient *coreiotMqtt;
   bool coreiotReady;
   SemaphoreHandle_t mutexMqtt;
+
+  // Pending attribute updates — set bởi HTTP handler (trong mutexContext),
+  // được publish bởi coreiot_task trong loop của nó (thread-safe với mutexMqtt).
+  bool pendingLedAttributeUpdate;
+  bool pendingLedAttributeValue;
 };
 
 #endif

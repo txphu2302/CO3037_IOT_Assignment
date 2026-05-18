@@ -91,6 +91,9 @@ void setup() {
   ctx->coreiotReady = false;
   ctx->mutexMqtt = xSemaphoreCreateMutex();
 
+  ctx->pendingLedAttributeUpdate = false;
+  ctx->pendingLedAttributeValue = false;
+
   serialLogInit(ctx);
 
   // Load saved configuration and start AP if needed (Task 4 + Task 6)
