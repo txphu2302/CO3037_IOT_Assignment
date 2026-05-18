@@ -1,6 +1,7 @@
 #include "pump.h"
 #include "global.h"
 #include "task_webserver.h"
+#include "coreiot.h"
 
 #include <WiFi.h>
 #include <time.h>
@@ -193,7 +194,13 @@ void task_pump(void *pvParameters)
     {
       lastOutputState = targetPumpState;
       lastHeartbeat = millis();
+
+      // Đồng bộ lên WebSocket (browser)
       broadcastPumpState();
+
+      // Đồng bộ lên CoreIOT attributes (giống cơ chế LED)
+      coreiot_publish_attribute(ctx, "pumpState", targetPumpState);
+      coreiot_publish_attribute(ctx, "modeState", pumpMode == 1);
     }
 
     vTaskDelay(pdMS_TO_TICKS(500));

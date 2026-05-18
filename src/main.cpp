@@ -37,7 +37,7 @@ static void task_mainloop(void *pvParameters) {
 
 void setup() {
   Serial.begin(115200);
-  //LittleFS.begin(true); LittleFS.remove("/info.dat"); ESP.restart();
+  // LittleFS.begin(true); LittleFS.remove("/info.dat"); ESP.restart();
 
   SharedContext *ctx = new SharedContext();
   ctx->temperature = 0;

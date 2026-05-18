@@ -82,15 +82,20 @@ bool check_info_File(SharedContext *ctx, bool check)
   const bool missingWifi = ctx->wifiSsid.isEmpty() && ctx->wifiPass.isEmpty();
   xSemaphoreGive(ctx->mutexContext);
 
+  if (!check)
+  {
+    // Luôn phát AP ngay khi boot, dù có hay không có credentials.
+    // User có thể vào 192.168.4.1 để cấu hình bất kỳ lúc nào.
+    startAP();
+  }
+
   if (missingWifi)
   {
-    if (!check)
-    {
-      startAP();
-    }
+    // Không có credentials → ở lại AP mode, không thử STA.
     return false;
   }
 
+  // Có credentials → báo caller tiếp tục kết STA (song song với AP).
   return true;
 }
 

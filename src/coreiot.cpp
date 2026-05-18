@@ -166,22 +166,25 @@ void coreiot_task(void *pvParameters)
       const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
 
       Serial.printf("setValuePump: params=%s\n", params ? "true" : "false");
-      Serial.println("setValuePump: Entered setValuePump");
-      Serial.println("setValuePump: params=" + String(params));
 
       xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
+      ctx->pumpMode = 1; // Tự động chuyển sang MANUAL
       ctx->pumpManualOverride = true;
       ctx->pumpManualState = params;
       xSemaphoreGive(ctx->mutexContext);
 
-      Serial.println("setValuePump: Published pumpManualState");
-
       if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), params ? "true" : "false");
 
-      Serial.println("setValuePump: Published responseTopic");
+      Webserver_sendata(ctx, "{\"pump_state\":\"" + String(params ? "ON" : "OFF") + "\", \"pump_mode\":\"MANUAL\", \"pump_controller\":\"MANUAL\"}");
 
-      Webserver_sendata(ctx, "{\"pump_state\":\"" + String(params ? "ON" : "OFF") + "\"}");
-      Serial.println("setValuePump: Called Webserver_sendata");
+      // Publish trực tiếp KHÔNG qua coreiot_publish_attribute để tránh deadlock:
+      // coreiot_publish_attribute dùng mutexMqtt nhưng ta đang ở trong MQTT callback
+      // (được gọi từ loop() vốn đã hold mutexMqtt) → deadlock nếu dùng mutex lại.
+      if (ctx->coreiotMqtt && ctx->coreiotMqtt->connected()) {
+        ctx->coreiotMqtt->publish("v1/devices/me/attributes", "{\"modeState\":true}");
+      }
+
+      Serial.println("setValuePump: Done");
       return;
     }
 
@@ -201,16 +204,22 @@ void coreiot_task(void *pvParameters)
     }
 
     if (strcmp(method, "setValueMode") == 0) {
-      const char* params = doc["params"] | "AUTO";
       const String requestId = topicStr.substring(topicStr.lastIndexOf('/') + 1);
       const String responseTopic = "v1/devices/me/rpc/response/" + requestId;
 
-      String modeStr = String(params);
-      Serial.printf("setValueMode: params=%s\n", modeStr.c_str());
-
-      if (modeStr != "AUTO" && modeStr != "MANUAL") {
-        modeStr = "AUTO";
+      // Parse linh hoạt: CoreIOT có thể gửi 1/0 (int), true/false (bool), hoặc "MANUAL"/"AUTO" (string)
+      String modeStr;
+      if (doc["params"].is<bool>()) {
+        modeStr = doc["params"].as<bool>() ? "MANUAL" : "AUTO";
+      } else if (doc["params"].is<int>()) {
+        modeStr = doc["params"].as<int>() == 1 ? "MANUAL" : "AUTO";
+      } else {
+        String p = doc["params"].as<String>();
+        if (p == "MANUAL" || p == "1" || p == "true") modeStr = "MANUAL";
+        else modeStr = "AUTO";
       }
+
+      Serial.printf("setValueMode: modeStr=%s\n", modeStr.c_str());
 
       xSemaphoreTake(ctx->mutexContext, portMAX_DELAY);
       if (modeStr == "MANUAL") {
@@ -227,7 +236,7 @@ void coreiot_task(void *pvParameters)
       if (ctx->coreiotMqtt) ctx->coreiotMqtt->publish(responseTopic.c_str(), modeStr.c_str());
 
       Serial.println("setValueMode: Calling Webserver_sendata");
-      Webserver_sendata(ctx, "{\"pump_mode\":\"" + modeStr + "\", \"pump_controller\":\"" + (modeStr == "MANUAL" ? "MANUAL" : "AUTO") + "\"}");
+      Webserver_sendata(ctx, "{\"pump_mode\":\"" + modeStr + "\", \"pump_controller\":\"" + modeStr + "\"}");
       return;
     } });
 
