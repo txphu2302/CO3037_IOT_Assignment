@@ -37,6 +37,15 @@ static void task_mainloop(void *pvParameters) {
 
 void setup() {
   Serial.begin(115200);
+
+  // Xóa WiFi credentials cũ trong NVS (Flash) để tránh ESP32 tự kết nối mạng cũ.
+  // Khi upload code mới, LittleFS bị format nhưng NVS thì không — nên ESP32 SDK
+  // vẫn nhớ WiFi cũ và tự reconnect, khiến AP "Yolo Uno" không phát được.
+  WiFi.mode(WIFI_STA);          // Cần set mode trước khi disconnect
+  WiFi.disconnect(true, true);  // true, true = disconnect + xóa NVS credentials
+  WiFi.mode(WIFI_OFF);          // Tắt hẳn WiFi, để check_info_File() khởi tạo lại sạch
+  delay(100);
+
   // LittleFS.begin(true); LittleFS.remove("/info.dat"); ESP.restart();
 
   SharedContext *ctx = new SharedContext();
