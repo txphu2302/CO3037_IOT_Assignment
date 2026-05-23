@@ -1,583 +1,162 @@
-# IoT Project Assignment - Task 4: Web Server in Access Point Mode
+# IoT Project Assignment - Task 6: Data Publishing to CoreIOT Cloud Server
 
-Dự án này cung cấp một giải pháp hoàn chỉnh để giám sát và điều khiển thiết bị IoT từ xa sử dụng vi điều khiển ESP32 (dòng YOLO UNO). Dự án tích hợp các công nghệ như FreeRTOS, AsyncWebServer, WebSocket và LittleFS để mang lại trải nghiệm tối ưu và tính ổn định cao.
+## 📝 Overview
 
-## 🌟 Các tính năng nổi bật
-
-### 1. Bảng điều khiển Web (Web Dashboard)
-- Giao diện người dùng hiện đại, thân thiện, được thiết kế với HTML/CSS/JS tĩnh và lưu trữ trực tiếp trong phân vùng `LittleFS` của ESP32.
-- **Giám sát thời gian thực:** Hiển thị trực tiếp các thông số Nhiệt độ, Độ ẩm (Cảm biến DHT20) và Độ ẩm đất.
-- **Biểu đồ động:** Vẽ biểu đồ biểu diễn sự thay đổi của dữ liệu môi trường theo thời gian thực thông qua thư viện `Chart.js`.
-- **Điều khiển thiết bị:** Hỗ trợ Bật/Tắt các thiết bị ngoại vi như Đèn LED và Máy Bơm nước.
-- **Điều khiển NeoPixel:** Tích hợp bộ chọn bảng màu (Color Palette) để điều khiển màu sắc đèn Neo Pixel RGB trực tiếp từ màn hình web.
-
-### 2. Cấu hình mạng thông minh (AP Mode & WiFi Scanner)
-- **Chế độ Access Point (AP):** Khi chưa có thông tin mạng WiFi, thiết bị sẽ tự động phát ra sóng WiFi (chế độ AP) để người dùng dùng điện thoại truy cập vào thiết lập.
-- **Tự động quét WiFi (WiFi Scanner):** Ngay khi mở mục Cài đặt trên Web, mạch sẽ tự động quét các mạng WiFi (băng tần 2.4GHz) xung quanh và hiển thị trong danh sách thả xuống. Người dùng chỉ cần click chọn mà không cần phải gõ tay (SSID).
-- **Lưu cấu hình an toàn:** Hỗ trợ lưu trữ cấu hình mạng Wi-Fi và tham số máy chủ Core IoT thông qua các file dữ liệu độc lập.
-
-### 3. Kiến trúc Đa tiến trình (FreeRTOS)
-- Hệ thống hoạt động dựa trên các Task (tiến trình) chạy song song và độc lập.
-- Sử dụng **Semaphore (Binary Semaphore)** để đồng bộ hóa các sự kiện phần cứng (ví dụ: phát hiện độ ẩm vượt mức cho phép sẽ thay đổi màu NeoPixel lập tức mà không cần dùng hàm `delay`).
-- Sử dụng **Mutex** để khóa/bảo vệ dữ liệu chia sẻ (SharedContext) giữa Webserver và Cảm biến, tránh lỗi xung đột bộ nhớ.
+Task 6 implements secure cloud integration by publishing real-time environmental telemetry from the ESP32-S3 microcontroller to the **CoreIOT Cloud Platform** (https://app.coreiot.io/). It leverages the **MQTT (Message Queuing Telemetry Transport)** protocol for lightweight, bidirectional communication. The system publishes sensor data and device attributes, and handles incoming Remote Procedure Calls (RPC) to allow real-time control of the water pump, LED, and system modes directly from the cloud dashboard.
 
 ---
 
-## ⚙️ Yêu cầu phần cứng
+## ⚠️ WiFi Station (STA) Mode Requirement
 
-- Bảng mạch vi điều khiển **YOLO UNO (ESP32-S3)**
-- Cảm biến Nhiệt độ / Độ ẩm **DHT20** (Giao tiếp I2C)
-- Cảm biến độ ẩm đất
-- Dây đèn/Led **NeoPixel (WS2812B)**
-- Đèn LED cơ bản và Relay (Máy bơm nước)
+> [!IMPORTANT]
+> The ESP32-S3 microcontroller must be in **Station (STA) Mode** (connected to a local WiFi network with Internet access) to publish data to the CoreIOT cloud server. 
 
----
-
-## 📁 Cấu trúc thư mục
-
-```text
-├── data/                  # Thư mục chứa các file giao diện (Nạp vào LittleFS)
-│   ├── index.html         # Giao diện chính (Bao gồm Dashboard & Cài đặt)
-│   ├── script.js          # Logic xử lý giao diện, WebSocket, Biểu đồ và Quét WiFi
-│   ├── styles.css         # File định dạng CSS cho toàn bộ web
-│   └── chart.js           # Thư viện vẽ biểu đồ
-├── include/               # Chứa các file Header (.h)
-│   ├── global.h           # Định nghĩa SharedContext, biến toàn cục cho FreeRTOS
-│   └── ...
-├── src/                   # Chứa các file mã nguồn C/C++ thực thi chính
-│   ├── main.cpp           # Khởi tạo hệ thống và khởi chạy các Task (FreeRTOS)
-│   ├── task_webserver.cpp # Định nghĩa Web API và WebSocket handler
-│   ├── task_wifi.cpp      # Điều hướng chuyển đổi giữa AP Mode và STA Mode
-│   ├── neo_blinky.cpp     # Nhận tín hiệu điều khiển đèn NeoPixel
-│   └── temp_humi_monitor.cpp # Task đọc cảm biến DHT20 liên tục
-└── platformio.ini         # File cấu hình thư viện và board mạch của PlatformIO
-```
-
-
-## 🚀 Hướng dẫn cài đặt và nạp Code
-
-### 1. Môi trường phát triển
-Dự án này được tối ưu cho phần mềm **Visual Studio Code (VSCode)** cài đặt kèm tiện ích mở rộng **PlatformIO IDE**.
-
-### 2. Nạp dữ liệu giao diện Web (Upload Filesystem)
-Trang web tĩnh của dự án không nằm trong code C++ mà nằm ở bộ nhớ Flash (LittleFS). Bạn bắt buộc phải nạp nó trước:
-1. Nhấn vào biểu tượng con kiến (PlatformIO) ở thanh công cụ bên trái VSCode.
-2. Mở mục **Project Tasks** -> `env:esp32...` -> **Platform** -> Click vào **Build Filesystem Image**.
-3. Cắm mạch ESP32 vào máy tính, sau đó click vào **Upload Filesystem Image**.
-
-### 3. Nạp mã nguồn thực thi (Upload Code)
-1. Ở cạnh dưới màn hình VSCode, nhấn vào biểu tượng dấu tick **(✓)** để Build (Biên dịch) mã nguồn C++.
-2. Nhấn vào biểu tượng mũi tên sang phải **(→)** để Upload (Nạp) code vào mạch ESP32.
-
-### 4. Cách sử dụng tính năng cấu hình Web
-1. Khởi động ESP32. Vì chưa có WiFi, nó sẽ phát ra mạng WiFi của riêng nó (Access Point).
-2. Dùng điện thoại kết nối vào mạng WiFi này (Nhớ **tắt 4G/Dữ liệu di động** để không bị lỗi không tải được trang).
-3. Mở trình duyệt web, truy cập địa chỉ IP mặc định: `192.168.4.1`.
-4. Trang web quản lý sẽ hiện ra. Bạn chuyển sang tab **⚙️ Cài đặt**. 
-5. Lúc này ESP32 sẽ tự động dò tìm các mạng WiFi 2.4GHz ở xung quanh và hiện danh sách. Chọn WiFi nhà bạn, nhập mật khẩu rồi bấm nút **Lưu cấu hình**.
-6. Mạch sẽ tự động lưu lại, tắt trạm phát (AP) và kết nối với Router WiFi nhà bạn như một thiết bị IoT bình thường (Chế độ STA).
+### Connection Flow & Transition (Luồng kết nối & chuyển đổi)
+1. **Initial Boot (AP Mode)**: On startup, if no WiFi credentials exist in the `/info.dat` configuration, the ESP32-S3 boots into **Access Point (AP) Mode**, broadcasting its own network SSID (`Yolo Uno`).
+2. **Web Portal Configuration**: The user accesses the local Web Dashboard at `192.168.4.1` and navigates to the **Settings** tab. The ESP32-S3 dynamically scans local 2.4GHz WiFi networks, allowing the user to select their home WiFi and enter their **CoreIOT Device Access Token**.
+3. **Transition to STA Mode**: Upon clicking **Save Configuration (Lưu cấu hình)**, the settings are written to LittleFS in JSON format (`/info.dat`). The microcontroller restarts.
+4. **Active MQTT Connection**: Upon reboot, the system loads the credentials, initializes WiFi in **AP+STA Mode**, connects to the Internet, and gives the `semInternetConnected` FreeRTOS Semaphore. The `coreiot_task` immediately starts, connecting to the MQTT broker at `app.coreiot.io` using the configured Device Access Token.
 
 ---
 
-## 🔧 Tính năng tự động hóa cục bộ (Task 2)
-Bên cạnh việc điều khiển qua Web, thiết bị hoạt động như một hệ thống cảnh báo môi trường tự động (Đồng bộ bằng FreeRTOS Semaphore):
-- **Bình thường (Độ ẩm < 50%):** Đèn NeoPixel sáng màu Xanh lá.
-- **Cảnh báo (Độ ẩm 50% - 70%):** Đèn NeoPixel chuyển sang màu Vàng.
-- **Nguy hiểm (Độ ẩm ≥ 70%):** Đèn NeoPixel chuyển sang màu Đỏ.
-*(Logic này phản ứng tức thời theo thời gian thực mà không bị ảnh hưởng bởi đường truyền mạng).*
-=======
-# IoT Project Assignment - Task 5: TinyML Deployment & Accuracy Evaluation
+## 📁 Configuration File Structure (`/info.dat`)
 
-## Overview
-
-Task 5 implements TensorFlow Lite (TinyML) model deployment on an ESP32-S3 microcontroller for real-time environmental risk assessment. The system trains a neural network model on environmental sensor data (temperature and humidity), deploys it as an optimized TFLite model on the edge device, and continuously evaluates its prediction accuracy against rule-based ground truth labels.
-
-
-
-## Task 5: TinyML Deployment & Accuracy Evaluation
-
-### Objective
-
-Deploy a TensorFlow Lite neural network model on the ESP32-S3 microcontroller to predict environmental risk levels based on temperature and humidity sensor readings. Evaluate the model's real-time accuracy by comparing predictions against rule-based ground truth labels and report performance metrics during continuous operation.
-
-### Hardware Components
-
-| Component | GPIO Pin | Description |
-|-----------|----------|-------------|
-| DHT20 Sensor | SDA: 11, SCL: 12 | Temperature & Humidity sensor via I2C |
-| ESP32-S3 MCU | - | Target device for TinyML model deployment |
-| Flash Memory | - | Storage for TFLite model binary |
-| RAM (SRAM) | - | Tensor arena for model inference (16 KB) |
-
-### System Architecture
-
-The TinyML system consists of three main components:
-
-1. **Dataset & Model Training** ([ml/train_export.py](ml/train_export.py))
-2. **TFLite Model Binary** ([ml/dht_risk_model.tflite](ml/dht_risk_model.tflite))
-3. **On-Device Inference** ([src/tinyml.cpp](src/tinyml.cpp))
-
----
-
-## 1. Dataset Description & Collection
-
-### Dataset Overview
-
-The training dataset is synthetically generated but realistic, based on a risk assessment function that combines temperature and humidity thresholds. The dataset is stored in [ml/dataset.csv](ml/dataset.csv) with approximately 5,000+ labeled samples.
-
-### Dataset Structure
-
-| Column | Type | Range | Description |
-|--------|------|-------|-------------|
-| temperature | float | 15.0 - 40.0 °C | Environmental temperature reading |
-| humidity | float | 20.0 - 98.0 % | Environmental humidity reading |
-| final_label | int | 1, 2, 3 | Risk level ground truth (1=Normal, 2=Warning, 3=Critical) |
-
-**Sample Data (first 20 rows):**
-```
-temperature,humidity,final_label
-15.1067,21.0640,1
-15.2627,22.8465,1
-14.3171,23.1829,1
-...
-15.2376,50.3189,2
-15.1012,50.8262,2
-14.4900,52.3252,2
-```
-
-### Data Collection Strategy
-
-#### **Phase 1: Grid Sampling Near Decision Boundaries**
-
-Critical regions around temperature and humidity thresholds are densely sampled:
-
-```python
-for t in np.linspace(15.0, 38.0, 28):          # 28 temperature points
-    for h in np.linspace(22.0, 95.0, 32):      # 32 humidity points
-        for _ in range(2):                      # 2 variations per point
-            # Add Gaussian noise to create realistic variance
-            tt = t + np.random.normal(0, 0.35)   # ±0.35°C std deviation
-            hh = h + np.random.normal(0, 0.9)    # ±0.9% std deviation
-            rows.append((tt, hh, final_label(tt, hh)))
-```
-
-This generates **1,792 samples** (~28 × 32 × 2) concentrated near decision boundaries for improved classification accuracy.
-
-#### **Phase 2: Random Coverage**
-
-Additional random samples fill the feature space uniformly:
-
-```python
-for _ in range(4000):  # Extra random samples
-    tt = np.random.uniform(15.0, 40.0)
-    hh = np.random.uniform(20.0, 98.0)
-    rows.append((tt, hh, final_label(tt, hh)))
-```
-
-This adds **4,000 random samples** for broader coverage and generalization.
-
-**Total Dataset Size: ~5,792 samples**
-
-### Labeling Strategy: Rule-Based Ground Truth
-
-Labels are determined by a rule-based risk assessment function that combines temperature and humidity thresholds:
-
-**Temperature Bands (LED states):**
-```c
-if (temperature >= 30.0) return 3;  // Critical
-if (temperature >= 25.0) return 2;  // Warning
-return 1;                            // Normal
-```
-
-**Humidity Bands (NeoPixel states):**
-```c
-if (humidity >= 70.0) return 3;     // Critical
-if (humidity >= 50.0) return 2;     // Warning
-return 1;                            // Normal
-```
-
-**Final Risk Label (worst-case scenario):**
-```c
-int final_label(float t, float h) {
-    int led = led_state_from_temperature(t);
-    int neo = neo_state_from_humidity(h);
-    return (led > neo) ? led : neo;  // Maximum of the two
+The configuration parameters are persisted locally in the LittleFS filesystem:
+```json
+{
+  "WIFI_SSID": "Your_WiFi_SSID",
+  "WIFI_PASS": "Your_WiFi_Password",
+  "CORE_IOT_TOKEN": "Your_CoreIOT_Device_Access_Token",
+  "CORE_IOT_SERVER": "app.coreiot.io",
+  "CORE_IOT_PORT": "1883"
 }
 ```
 
-This approach ensures:
-- **Consistency**: Labels match firmware thresholds exactly
-- **Physical Meaning**: Labels represent real risk levels (Normal/Warning/Critical)
-- **Traceability**: Labels can be verified against hardware behavior
+---
 
-### Threshold Summary
+## 📊 Telemetry Specifications (Thông số Telemetry)
 
-| Feature | State | Condition | Risk Level |
-|---------|-------|-----------|-----------|
-| **Temperature** | 1 | T < 25°C | Normal |
-| | 2 | 25°C ≤ T < 30°C | Warning |
-| | 3 | T ≥ 30°C | Critical |
-| **Humidity** | 1 | H < 50% | Normal |
-| | 2 | 50% ≤ H < 70% | Warning |
-| | 3 | H ≥ 70% | Critical |
-| **Final Label** | 1,2,3 | max(temp_state, humidity_state) | Worst Case |
+The ESP32-S3 publishes structured sensor data to the CoreIOT platform every **10 seconds** using the telemetry topic.
+
+- **MQTT Telemetry Topic**: `v1/devices/me/telemetry`
+- **JSON Payload Format**:
+  ```json
+  {
+    "temperature": 27.5,
+    "humidity": 62.4,
+    "soil_moisture": 45.2,
+    "system_status": "Normal",
+    "pump_state": "OFF",
+    "lat": 10.880018,
+    "long": 106.806336
+  }
+  ```
+
+### Data Fields Table
+| Key | Type | Description |
+|-----|------|-------------|
+| `temperature` | float | Real-time temperature from DHT20 sensor (°C) |
+| `humidity` | float | Real-time humidity from DHT20 sensor (%) |
+| `soil_moisture` | float | Soil moisture percentage (%) |
+| `system_status`| string | System alert level: `"Normal"`, `"Warning"`, or `"Critical"` |
+| `pump_state` | string | Current state of the water pump: `"ON"` or `"OFF"` |
+| `lat` | float | Hardcoded latitude for location mapping (e.g., `10.880018`) |
+| `long` | float | Hardcoded longitude for location mapping (e.g., `106.806336`) |
 
 ---
 
-## 2. Model Architecture & Training
+## ⚙️ Attribute Synchronization (Đồng bộ Thuộc tính)
 
-### Neural Network Design
+Local changes made via the Web UI are synchronized with CoreIOT as device attributes, ensuring the cloud dashboard reflects local hardware state adjustments immediately.
 
-A lightweight Keras Sequential model optimized for embedded deployment:
-
-```python
-model = tf.keras.Sequential([
-    tf.keras.layers.Input(shape=(2,)),           # Input: [temperature, humidity]
-    tf.keras.layers.Dense(24, activation="relu"), # Hidden layer 1: 24 neurons
-    tf.keras.layers.Dense(16, activation="relu"), # Hidden layer 2: 16 neurons
-    tf.keras.layers.Dense(3, activation="softmax") # Output: 3 classes (softmax)
-])
-```
-
-**Model Specifications:**
-- **Input Features**: 2 (temperature, humidity)
-- **Output Classes**: 3 (Normal, Warning, Critical)
-- **Total Parameters**: ~1,300 (fits easily in MCU SRAM)
-- **Model Type**: Dense feed-forward network (fully connected)
-
-### Training Configuration
-
-**Optimizer & Loss:**
-- **Optimizer**: Adam with learning rate 0.002
-- **Loss Function**: Sparse Categorical Crossentropy
-- **Metrics**: Accuracy
-
-**Data Split:**
-```python
-n_samples = 5792
-train_split = int(n_samples * 0.85)  # 4,923 training samples
-val_split = n_samples - train_split    # 869 validation samples
-```
-
-**Training Hyperparameters:**
-```python
-epochs = 80
-batch_size = 64
-early_stopping = EarlyStopping(
-    monitor='val_accuracy',
-    mode='max',
-    patience=15,  # Stop if no improvement for 15 epochs
-    restore_best_weights=True
-)
-```
-
-### Model Conversion to TFLite
-
-The trained Keras model is converted to TensorFlow Lite float32 format:
-
-```python
-converter = tf.lite.TFLiteConverter.from_keras_model(model)
-converter.optimizations = []  # No quantization (keep float32 precision)
-tflite_model = converter.convert()
-```
-
-**Output Artifacts:**
-- **TFLite Model**: [ml/dht_risk_model.tflite](ml/dht_risk_model.tflite) (~20-40 KB)
-- **Header File**: [include/dht_anomaly_model.h](include/dht_anomaly_model.h) (hex-encoded binary)
+- **MQTT Attributes Topic**: `v1/devices/me/attributes`
+- **Synchronized Attributes**:
+  - `ledState` (boolean): `true` when manual LED override is active; `false` when inactive.
+  - `modeState` (boolean): `true` when pump mode is `MANUAL`; `false` when mode is `AUTO`.
 
 ---
 
-## 3. On-Device Implementation & Inference
+## 🎮 Remote Control via RPC (Điều khiển từ xa qua RPC)
 
-### TinyML Task Setup
+CoreIOT utilizes **Remote Procedure Calls (RPC)** to send commands to the ESP32-S3 device. The device subscribes to the request topic and processes incoming JSON commands.
 
-The TinyML task is initialized in [src/main.cpp](src/main.cpp) and runs concurrently with other tasks:
+- **Subscribe Topic**: `v1/devices/me/rpc/request/+`
+- **Response Topic**: `v1/devices/me/rpc/response/{requestId}`
 
-```cpp
-xTaskCreate(tiny_ml_task, "Tiny ML Task", 8192, (void *)ctx, 2, NULL);
-```
+The firmware handles 6 distinct RPC methods:
 
-### Model Initialization
+### 1. LED Control
+- **`getValueLED`**:
+  - *Response*: `true` / `false` representing the current manual LED state.
+- **`setValueLED`**:
+  - *Params*: `true` / `false`
+  - *Action*: Updates the manual LED override and state. Pushes state to Web UI via WebSockets and publishes the `ledState` attribute.
 
-The TFLite model is loaded and initialized in [src/tinyml.cpp](src/tinyml.cpp):
+### 2. Water Pump Control
+- **`getValuePump`**:
+  - *Response*: `true` / `false` representing the current water pump state.
+- **`setValuePump`**:
+  - *Params*: `true` / `false`
+  - *Action*: Switches the pump to `MANUAL` mode, sets the pump state, publishes the `modeState` attribute, and broadcasts the update to Web UI clients.
 
-```cpp
-void setupTinyML() {
-    // Create error reporter for diagnostic messages
-    static tflite::MicroErrorReporter micro_error_reporter;
-    error_reporter = &micro_error_reporter;
-    
-    // Load model from flash memory
-    model = tflite::GetModel(dht_anomaly_model_tflite);
-    
-    // Verify schema version compatibility
-    if (model->version() != TFLITE_SCHEMA_VERSION) {
-        error_reporter->Report("Model schema version mismatch");
-        return;
-    }
-    
-    // Create operation resolver (loads all supported ops)
-    static tflite::AllOpsResolver resolver;
-    
-    // Allocate tensor arena (working memory for inference)
-    static uint8_t tensor_arena[16 * 1024];  // 16 KB
-    
-    // Create interpreter
-    static tflite::MicroInterpreter static_interpreter(
-        model, resolver, tensor_arena, 16 * 1024, error_reporter
-    );
-    interpreter = &static_interpreter;
-    
-    // Allocate tensors
-    if (interpreter->AllocateTensors() != kTfLiteOk) {
-        error_reporter->Report("AllocateTensors() failed");
-        return;
-    }
-    
-    // Get input/output tensor pointers
-    input = interpreter->input(0);   // Expects [temperature, humidity]
-    output = interpreter->output(0); // Predicts [class0, class1, class2] scores
-    
-    s_tinyml_ready = true;
-}
-```
-
-### Inference Loop
-
-The main inference task runs every 5 seconds:
-
-```cpp
-void tiny_ml_task(void *pvParameters) {
-    SharedContext *ctx = (SharedContext *)pvParameters;
-    
-    setupTinyML();
-    
-    unsigned long inferences = 0;
-    unsigned long correct = 0;
-    
-    while (1) {
-        // 1. Read sensor data from context (protected by mutex)
-        xSemaphoreTake(ctx->mutexContext, pdMS_TO_TICKS(2000));
-        float temperature = ctx->temperature;
-        float humidity = ctx->humidity;
-        xSemaphoreGive(ctx->mutexContext);
-        
-        // 2. Validate sensor readings
-        if (isnan(temperature) || isnan(humidity) || 
-            temperature < 0.0f || humidity < 0.0f) {
-            Serial.println("TinyML: skip (invalid DHT reading)");
-            vTaskDelay(pdMS_TO_TICKS(5000));
-            continue;
-        }
-        
-        // 3. Prepare input tensor
-        input->data.f[0] = temperature;  // Feature 1: temperature
-        input->data.f[1] = humidity;     // Feature 2: humidity
-        
-        // 4. Run inference and measure latency
-        unsigned long t0 = millis();
-        if (interpreter->Invoke() != kTfLiteOk) {
-            error_reporter->Report("Invoke failed");
-            vTaskDelay(pdMS_TO_TICKS(5000));
-            continue;
-        }
-        unsigned long t1 = millis();
-        
-        // 5. Extract prediction (argmax of output softmax scores)
-        int best = argmax_float(output->data.f, 3);
-        int predicted = best + 1;  // Classes 0..2 → Labels 1..3
-        
-        // 6. Compare with rule-based ground truth
-        int expected = risk_final_label(temperature, humidity);
-        
-        // 7. Update accuracy metrics
-        if (predicted == expected) correct++;
-        inferences++;
-        
-        // 8. Log inference results
-        Serial.printf("TinyML T=%.1fC H=%.1f%% | rule=%d pred=%d | "
-                      "p=[%.2f,%.2f,%.2f] | %lums | roll_acc=%.1f%% (%lu/%lu)\n",
-                      temperature, humidity, expected, predicted,
-                      output->data.f[0], output->data.f[1], output->data.f[2],
-                      (t1 - t0),
-                      100.0f * correct / inferences,
-                      correct, inferences);
-        
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-}
-```
-
-### Key Implementation Features
-
-**1. Thread-Safe Data Access:**
-- Mutex protects `ctx->temperature` and `ctx->humidity` from concurrent access
-- Timeout of 2 seconds prevents deadlock if other tasks stall
-
-**2. Inference Validation:**
-- Checks for NaN (Not-a-Number) sensor readings
-- Skips inference if data is invalid
-- Prevents erroneous predictions on bad data
-
-**3. Latency Measurement:**
-```cpp
-unsigned long t0 = millis();
-if (interpreter->Invoke() != kTfLiteOk) { /* handle error */ }
-unsigned long t1 = millis();
-unsigned long inference_time = t1 - t0;  // milliseconds
-```
-
-**4. Accuracy Tracking:**
-```cpp
-if (predicted == expected) correct++;
-inferences++;
-rolling_accuracy = (100.0f * correct) / inferences;
-```
+### 3. Pump Mode Control
+- **`getValueMode`**:
+  - *Response*: `"AUTO"` / `"MANUAL"`
+- **`setValueMode`**:
+  - *Params*: `"AUTO"` / `"MANUAL"` (or boolean/integer equivalents)
+  - *Action*: Toggles the operation mode of the pump, updates `pumpController` state, and pushes updates to Web UI.
 
 ---
 
-## 4. Accuracy Evaluation & Performance Metrics
+## 🏗️ Architecture & Thread-Safety (Kiến trúc & Đảm bảo đa luồng)
 
-### Real-Time Accuracy Monitoring
+To operate reliably in a multi-tasking FreeRTOS environment, the CoreIOT implementation includes several safety designs:
 
-The system continuously logs predictions and compares them against rule-based ground truth:
-
-**Output Format:**
-```
-TinyML T=25.3C H=55.2% | rule=2 pred=2 | p=[0.12,0.78,0.10] | 45ms | roll_acc=96.5% (115/119)
-```
-
-**Metric Interpretation:**
-- `T=25.3C H=55.2%`: Current sensor readings
-- `rule=2 pred=2`: Ground truth (2) vs prediction (2) - **CORRECT**
-- `p=[0.12,0.78,0.10]`: Softmax probabilities for classes [1, 2, 3]
-  - Class 1 (Normal): 12%
-  - Class 2 (Warning): 78% (highest - predicted class)
-  - Class 3 (Critical): 10%
-- `45ms`: Time to run inference on ESP32-S3
-- `roll_acc=96.5%`: Rolling accuracy (correct predictions / total predictions)
-- `(115/119)`: 115 correct out of 119 total inferences
-
-### Expected Performance
-
-**On Validation Dataset (During Training):**
-- Validation Accuracy: **95-99%** (depends on training run)
-- Loss: **0.02-0.08**
-
-**On Hardware (Real-Time):**
-- Inference Latency: **30-50 ms** per prediction
-- Memory Usage:
-  - Model: ~20-40 KB
-  - Tensor Arena: 16 KB
-  - Stack: ~2 KB per inference
-- CPU Load: ~5-10% (running every 5 seconds)
-
-### Accuracy Factors
-
-**Factors Supporting High Accuracy:**
-1. **Simple Decision Boundary**: 3-class classification is easier than continuous regression
-2. **Clean Training Data**: Synthetically generated with known rule-based labels
-3. **Well-Separated Classes**: Temperature/humidity thresholds are distinct
-4. **Adequate Training**: 5,792 samples >> model parameters (~1,300)
-
-**Potential Sources of Error:**
-1. **Sensor Noise**: DHT20 readings may have ±2-3% humidity error
-2. **Boundary Cases**: Readings near threshold values (e.g., 24.9°C vs 25.1°C)
-3. **Model Generalization**: Unseen sensor drift or environmental conditions
-
-### Validation Strategy
-
-**During Model Training:**
-- 85/15 train/validation split
-- Early stopping to prevent overfitting
-- Validation accuracy monitored every epoch
-
-**During Hardware Execution:**
-- Every inference compared to rule-based ground truth
-- Rolling accuracy computed (current / all-time)
-- Inference time logged for performance analysis
-
-### Expected Results Discussion
-
-Given the task's design:
-
-1. **Expected Accuracy: 95-98%** on real hardware
-   - Same data distribution as training set
-   - Simple classification task
-   - Well-defined decision boundaries
-
-2. **Why Not Perfect (100%)?**
-   - Sensor noise in DHT20 readings
-   - Model trained on clean synthetic data, hardware has real noise
-   - Boundary region ambiguity (e.g., T=24.99°C is Normal vs T=25.01°C is Warning)
-
-3. **Inference Speed: 30-50 ms**
-   - Reasonable for 5-second polling interval
-   - Does not block other tasks (asynchronous in FreeRTOS)
-   - ESP32-S3 runs inference efficiently due to Xtensa dual-core architecture
+1. **Shared Context Protection (`mutexContext`)**:
+   - FreeRTOS Mutex ensures that readings from `temperature`, `humidity`, and `soilMoisture` are accessed thread-safely without memory corruption.
+2. **MQTT Client Mutual Exclusion (`mutexMqtt`)**:
+   - Access to the underlying `PubSubClient` is restricted by `mutexMqtt` since it is shared between the telemetry publishing routine and other handlers.
+3. **Deadlock Avoidance in Callbacks**:
+   - Instead of calling blocking mutex requests inside the MQTT incoming callback (which runs in the context of `PubSubClient::loop()`), local state updates are queued safely, and non-blocking asynchronous publication triggers are set (e.g., `pendingLedAttributeUpdate`).
 
 ---
 
-## File Structure
+## 🚀 Setup & Execution Guide (Hướng dẫn Triển khai & Chạy hệ thống)
 
-```
-ml/
-├── dataset.csv                  # Training dataset (~5,792 samples)
-├── dht_risk_model.tflite        # Compiled TFLite model binary
-├── train_export.py              # Training script (Keras → TFLite)
-└── requirements.txt             # Python dependencies
+### Step 1: Create a Device on CoreIOT
+1. Log in to [CoreIOT Console](https://app.coreiot.io/).
+2. Navigate to **Devices** and click **Add Device**.
+3. Set the Device Name (e.g., `ESP32-S3-DHT20`) and select the appropriate Device Profile.
+4. Once created, click on the device and copy the **Device Access Token** from the details page.
 
-include/
-├── tinyml.h                     # TinyML task declaration
-├── dht_anomaly_model.h          # Hex-encoded TFLite model
-└── risk_label.h                 # Rule-based label functions
+### Step 2: Build & Flash Firmware
+1. Open the project in VSCode with **PlatformIO**.
+2. Build the filesystem image: **PlatformIO -> env:esp32... -> Platform -> Build Filesystem Image**.
+3. Upload the filesystem: **PlatformIO -> env:esp32... -> Platform -> Upload Filesystem Image**.
+4. Build and upload the main firmware: Click the arrow button **(→)** in the bottom status bar.
 
-src/
-├── tinyml.cpp                   # TinyML inference implementation
-├── temp_humi_monitor.cpp        # DHT20 sensor reading task
-└── main.cpp                     # FreeRTOS task creation
+### Step 3: Device Provisioning (WiFi & CoreIOT Token)
+1. On boot, connect your smartphone/laptop to the WiFi network broadcast by the ESP32 (SSID: `Yolo Uno`, Password: `yolouno_default` or matching configurations).
+2. Open a browser and go to `192.168.4.1`.
+3. Go to the **⚙️ Settings** (Cài đặt) tab.
+4. Select your local 2.4GHz WiFi SSID from the dynamically populated dropdown list and enter the password.
+5. Paste your **CoreIOT Device Access Token** into the token field.
+6. Make sure the MQTT server is set to `app.coreiot.io` and the port to `1883`.
+7. Click **Lưu cấu hình (Save Configuration)**.
 
-lib/
-├── TensorFlowLite_ESP32/        # TFLite Micro library
-└── DHT20/                       # DHT20 sensor driver
-```
-
----
-
-## Running the System
-
-### Prerequisites
-
-```bash
-pip install -r ml/requirements.txt  # tensorflow, numpy, etc.
-```
-
-### Training & Export
-
-Generate dataset and train model:
-```bash
-python ml/train_export.py
-```
-
-Outputs:
-- `ml/dataset.csv` - Training dataset
-- `ml/dht_risk_model.tflite` - Model binary
-- `include/dht_anomaly_model.h` - C++ header
-
-### Deployment
-
-1. Build and upload firmware to ESP32-S3
-2. Open Serial Monitor at 115200 baud
-3. Observe TinyML inference logs every 5 seconds
+### Step 4: Verification
+1. Open the Serial Monitor at `115200` baud. You should observe:
+   - Successful WiFi connection and assigned local IP.
+   - CoreIOT connection log: `MQTT connected` or `CoreIOT MQTT connection established`.
+2. Go to the **CoreIOT Cloud Dashboard**:
+   - Under the **Latest Telemetry** tab of your device, you should see temperature, humidity, soil moisture, system status, pump state, latitude, and longitude updating every 10 seconds.
+   - Test controlling the LED or Water Pump from the dashboard using the RPC widgets and verify that the physical board actuators trigger instantly.
 
 ---
 
-## References
+## 📚 CoreIOT References
 
-- [TensorFlow Lite Micro Documentation](https://github.com/tensorflow/tflite-micro)
-- [TensorFlow Lite Conversion Guide](https://www.tensorflow.org/lite/convert)
-- [ESP32 TensorFlow Lite Support](https://github.com/espressif/tflite-micro-esp-examples)
-- [FreeRTOS Documentation](https://www.freertos.org/)
-- [DHT20 Sensor Datasheet](https://datasheet.lcsc.com/lcsc/2010011713150451_ASAIR-DHT20_C3294963.pdf)
-- [ESP32-S3 Technical Reference](https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf)
-
+- [CoreIOT Cloud Platform Website](https://app.coreiot.io/)
+- [PubSubClient MQTT Library for Arduino](https://pubsubclient.knolleary.net/)
+- [ArduinoJson Library Reference](https://arduinojson.org/)
+- [FreeRTOS Task & Mutex Documentation](https://www.freertos.org/)
